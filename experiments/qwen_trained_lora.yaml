@@ -1,9 +1,9 @@
 # Trained-LoRA breeding: two skills trained on disjoint TRAIN splits of arc_easy and hellaswag.
 name: qwen25-05b-trained-lora
-base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen2.5-0.5B
+base_model: ./work/models/Qwen2.5-0.5B
 parents:
-  - {name: arc, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/arc}
-  - {name: hellaswag, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/hellaswag}
+  - {name: arc, model: ./work/adapters_trained/arc}
+  - {name: hellaswag, model: ./work/adapters_trained/hellaswag}
 mode: lora
 method: linear
 selection: pareto

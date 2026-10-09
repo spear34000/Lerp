@@ -1,9 +1,9 @@
 # Evolution vs random search: ARC-Easy LoRA + BoolQ LoRA (complementary skills). Search items: first 100 per task.
 name: qb-rand
-base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen2.5-0.5B
+base_model: ./work/models/Qwen2.5-0.5B
 parents:
-  - {name: arc, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/arc}
-  - {name: boolq, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/boolq}
+  - {name: arc, model: ./work/adapters_trained/arc}
+  - {name: boolq, model: ./work/adapters_trained/boolq}
 mode: lora
 method: linear
 selection: pareto

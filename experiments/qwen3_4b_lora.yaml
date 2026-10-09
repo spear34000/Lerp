@@ -1,9 +1,9 @@
 # Qwen3-4B-Base + two LoRAs trained on disjoint TRAIN splits (arc_easy / hellaswag).
 name: qwen3-4b-trained-lora
-base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B-Base
+base_model: ./work/models/Qwen3-4B-Base
 parents:
-  - {name: arc, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_q3/arc}
-  - {name: hellaswag, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_q3/hellaswag}
+  - {name: arc, model: ./work/adapters_q3/arc}
+  - {name: hellaswag, model: ./work/adapters_q3/hellaswag}
 mode: lora
 method: linear
 selection: pareto

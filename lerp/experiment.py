@@ -29,6 +29,11 @@ from .merge import mergekit_config
 from .spec import Spec, load_spec, save_spec, spec_to_dict
 
 
+# Scores whose evaluator is part of the verified toolchain: the lm-eval harness, or Lerp's own resident evaluator
+# (lerp.resident), whose prompts, continuation tokenization and metrics are checked against lm-eval.
+VERIFIED_SOURCES = frozenset({"lm_eval", "lerp_eval"})
+
+
 class BreederError(RuntimeError):
     pass
 
@@ -182,9 +187,9 @@ def compute_fitness(spec: Spec, metrics: dict[str, float]) -> float:
 
 
 def _score_document(spec: Spec, metrics: dict[str, float], source: str, *,
-                    evidence: str | None = None, runtime_device: str | None = None) -> dict:
-    if source not in {"manual", "lm_eval"}:
-        raise BreederError("Score source must be manual or lm_eval")
+                    evidence: str | None = None, runtime_device: str | None = None, backend: str = "hf") -> dict:
+    if source not in {"manual", "lm_eval", "lerp_eval"}:
+        raise BreederError("Score source must be manual, lm_eval or lerp_eval")
     return {
         "fitness": compute_fitness(spec, metrics),
         "metrics": metrics,
@@ -200,16 +205,16 @@ def _score_document(spec: Spec, metrics: dict[str, float], source: str, *,
             "chat_template": spec.evaluation.apply_chat_template,
             "device": runtime_device or spec.evaluation.device,
             "batch_size": spec.evaluation.batch_size,
-            "backend": "hf",
+            "backend": backend,
         },
     }
 
 
 def record_score(run: Path, gen: int, idx: int, metrics: dict[str, float], *, source: str, overwrite: bool = False,
-                 evidence: str | None = None, runtime_device: str | None = None) -> dict:
+                 evidence: str | None = None, runtime_device: str | None = None, backend: str = "hf") -> dict:
     spec, _ = load_run(run)
     load_candidate(run, gen, idx)
-    doc = _score_document(spec, metrics, source, evidence=evidence, runtime_device=runtime_device)
+    doc = _score_document(spec, metrics, source, evidence=evidence, runtime_device=runtime_device, backend=backend)
     path = candidate_dir(run, gen, idx) / "score.json"
     if path.exists() and not overwrite:
         raise BreederError("Already scored. Use --overwrite only if intentionally replacing measurements")
@@ -630,6 +635,21 @@ def _baseline_ref(spec: Spec, name: str) -> str:
     raise BreederError(f"Unknown baseline {name!r}. Choose base or one of: {[p.name for p in spec.parents]}")
 
 
+def record_baseline(run: Path, name: str, metrics: dict[str, float], *, source: str, evidence: str | None,
+                    runtime_device: str, backend: str, overwrite: bool = False) -> dict:
+    """Store a baseline score computed outside `evaluate_baseline` (for example by the resident evaluator)."""
+    spec, _ = load_run(run)
+    ref = _baseline_ref(spec, name)
+    folder = run / "baselines" / name
+    folder.mkdir(parents=True, exist_ok=True)
+    if (folder / "score.json").exists() and not overwrite:
+        raise BreederError(f"Baseline {name} already scored; pass --overwrite")
+    doc = {**_score_document(spec, metrics, source, evidence=evidence, runtime_device=runtime_device, backend=backend),
+           "model_reference": ref, "baseline_name": name}
+    _write_json(folder / "score.json", doc)
+    return doc
+
+
 def evaluate_baseline(run: Path, name: str, *, device: str | None = None, overwrite: bool = False, retry_partial: bool = False) -> dict:
     spec, _ = load_run(run)
     verify_frozen_inputs(run, spec)
@@ -667,13 +687,13 @@ def comparisons(run: Path, *, include_simulated: bool = False) -> list[dict]:
     """
     candidates = leaderboard(run, include_simulated=include_simulated)
     measured = {name: score for name, score in baselines(run).items()
-                if score.get("source") == "lm_eval"}
+                if score.get("source") in VERIFIED_SOURCES}
     if not measured:
         raise BreederError("No verified-lm-eval parent baseline scores yet. Run: lerp baseline -r RUN --name all")
     comparisons_list = []
     for c in candidates:
         score = c["score"]
-        if score.get("source") != "lm_eval":
+        if score.get("source") not in VERIFIED_SOURCES:
             continue
         comparable = [(name, baseline) for name, baseline in measured.items()
                       if score.get("evaluation_settings") == baseline.get("evaluation_settings")]
@@ -787,7 +807,7 @@ def export_recipe(run: Path, out: Path, *, candidate_id: str | None = None) -> P
     else:
         if not ranked:
             raise BreederError("No scored real candidates to export")
-        evaluated = [c for c in ranked if c["score"].get("source") == "lm_eval"]
+        evaluated = [c for c in ranked if c["score"].get("source") in VERIFIED_SOURCES]
         if not evaluated:
             raise BreederError("No lm-eval-scored candidates: automatic champion selection refuses unverified manual scores")
         winner = evaluated[0]
@@ -855,7 +875,7 @@ def validate_holdout(
         raise BreederError("Holdout cannot use staged screening (evaluate all holdout tasks)")
     if baseline != "all" and baseline != "none" and baseline not in {"base", *(p.name for p in spec.parents)}:
         raise BreederError("--baseline must be all, none, base or one parent name")
-    ranked = [c for c in leaderboard(run, include_simulated=False) if c["score"].get("source") == "lm_eval"]
+    ranked = [c for c in leaderboard(run, include_simulated=False) if c["score"].get("source") in VERIFIED_SOURCES]
     if candidate_id:
         chosen = next((c for c in ranked if c["id"] == candidate_id), None)
         if chosen is None:

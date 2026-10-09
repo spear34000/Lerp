@@ -1,6 +1,7 @@
 """Versioned, conservative configuration for reproducible merge experiments."""
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass, field
@@ -28,6 +29,7 @@ class EvalTask:
     name: str
     metric: str = "acc_norm,none"
     weight: float = 1.0
+    definition: str | None = None  # canonical JSON of a declarative `task:` block (see lerp.tasks); None = lm-eval name / built-in
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,17 @@ class SpecError(ValueError):
     pass
 
 
+def _task_definition(name: str, block: Any) -> str | None:
+    if block is None:
+        return None
+    from .tasks import TaskError, validate_definition
+    try:
+        validate_definition(name, block)
+    except TaskError as exc:
+        raise SpecError(str(exc)) from exc
+    return json.dumps(block, sort_keys=True, ensure_ascii=False)
+
+
 def parse_spec(raw: dict[str, Any]) -> Spec:
     if not isinstance(raw, dict):
         raise SpecError("Experiment YAML must contain a mapping")
@@ -100,6 +113,7 @@ def parse_spec(raw: dict[str, Any]) -> Spec:
                 name=str(name),
                 metric=str((opts or {}).get("metric", "acc_norm,none")),
                 weight=float((opts or {}).get("weight", 1.0)),
+                definition=_task_definition(str(name), (opts or {}).get("task")),
             )
             for name, opts in task_defs.items()
         )
@@ -260,7 +274,8 @@ def spec_to_dict(spec: Spec) -> dict[str, Any]:
         **({"search_methods": list(spec.search_methods)} if spec.method == "auto" else {}),
         **({"tensor_rules": [{"match": m, "group": g} for m, g in spec.tensor_rules]} if spec.tensor_rules else {}),
         "evaluation": {
-            "tasks": {t.name: {"metric": t.metric, "weight": t.weight} for t in spec.evaluation.tasks},
+            "tasks": {t.name: {"metric": t.metric, "weight": t.weight, **({"task": json.loads(t.definition)} if t.definition else {})}
+                  for t in spec.evaluation.tasks},
             "device": spec.evaluation.device,
             "batch_size": spec.evaluation.batch_size,
             "limit": spec.evaluation.limit,

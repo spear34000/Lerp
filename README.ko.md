@@ -14,9 +14,9 @@ Lerp는 같은 베이스에서 나온 모델(**LoRA 어댑터 또는 전체 체�
 
 ## 특징
 
-- **후보당 몇 초**: 베이스 모델을 가속기에 올려 둔 채 가중치를 덮어쓰고 바로 점수를 매깁니다. 0.5B는 5초, Qwen3-4B는 29초입니다(후보마다 `lm-eval`을 새로 띄우면 각각 약 285초, 11~14분).
+- **후보당 몇 초**: `lerp search`는 모델 하나를 가속기에 올려 둔 채 후보를 제자리에서 덮어쓰고 바로 점수를 매깁니다. 0.5B 4초, Qwen3-4B 29초, OLMoE(MoE 69억, 전체 체크포인트) 44초입니다(후보마다 `lm-eval`을 새로 띄우면 각각 약 285초, 11~14분, 10분).
 - **적은 평가로 탐색**: GP(가우시안 프로세스) 베이지안 탐색이 진화 탐색의 3분의 1 평가로 같은 품질을 찾았습니다.
-- **모델 계열 독립**: 텐서 이름 규칙 하나로 MoE 라우터/전문가, 멀티모달 타워까지 처리하고, 낯선 구조는 설정(`tensor_rules`)만으로 지원합니다.
+- **모델 계열·벤치마크 독립**: 텐서 이름 규칙 하나로 MoE 라우터/전문가, 멀티모달 타워까지 처리하고, 낯선 구조는 설정(`tensor_rules`)으로, 객관식 벤치마크는 설정 파일의 `task:` 블록으로 추가합니다(코드 수정 없음).
 - **검증 가능**: 입력과 출력을 SHA-256으로 고정하고, 탐색에 쓰지 않은 문항으로 다시 채점하며, 가짜 점수가 실제 결과에 섞이지 않게 막습니다.
 
 ## 빠른 시작
@@ -39,8 +39,9 @@ lerp init -c my.yaml -o runs/my && lerp freeze -r runs/my --strict
 lerp cycle -r runs/my --rounds 3 --engine lora
 lerp validate -r runs/my -c examples/holdout_evaluation.yaml --baseline all
 
-# 또는 상주 루프: 후보당 몇 초, 과제당 300문항, 마지막에 새 문항으로 재검증
-python examples/fast_merge_eval.py --config my.yaml --limit 300 --budget 30 --strategy gp --validate-limit 300
+# 또는 `lerp search`: 모델 하나를 올려 둔 채 후보를 제자리에서 섞고 몇 초 만에 채점 (LoRA·전체 체크포인트 모두)
+lerp search -r runs/my --rounds 6 --baselines --device xpu
+lerp build  -r runs/my -g 5 -i 0 --engine lora        # 우승 후보만 실제로 만들고 검증
 ```
 
 Windows에서는 `PYTHONUTF8=1`을 설정하세요.
@@ -49,7 +50,7 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 
 | 질문 | 결과 |
 |---|---|
-| 상주 루프 속도 | 0.5B 285초 → 5초, Qwen3-4B 11~14분 → 29초. 점수는 `lm-eval`과 100문항당 1문항 이내로 일치 |
+| `lerp search` 속도 | 0.5B 285초 → 4초, Qwen3-4B 11~14분 → 29초, OLMoE 약 10분 → 44초. 점수는 `lm-eval`과 100문항당 1~3문항 이내로 일치 |
 | 병합이 도움이 되나 | **능력이 서로 보완적일 때만.** ARC LoRA + BoolQ LoRA(Qwen2.5-0.5B)는 새 문항에서 0.78 대 부모 0.71/0.69(+0.07, 표준오차의 약 3배). 약하거나 중복되는 쌍은 더 나은 부모 대비 이득이 없었습니다 |
 | GP vs 진화 | GP 8회 평가가 진화 24회 평가와 같은 수준(새 문항 적합도 0.739 vs 0.741). 진화는 무작위 탐색보다 낫지 않았습니다 |
 | 큰/특이한 체크포인트 | Gemma 4 E4B(멀티모달 16GB) 5분, OLMoE-1B-7B(전문가 64개/층) 55초에 병합, 그룹별 가중치가 정확히 적용됨 |
@@ -59,7 +60,7 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 
 - 파일만으로는 두 체크포인트가 같은 베이스에서 나왔는지 증명할 수 없습니다.
 - 약 14GB를 넘는 병합본은 양자화 없이는 16GB GPU에서 평가할 수 없습니다(GGUF 백엔드 미구현). 병합 자체는 텐서 단위 스트리밍이라 가능합니다.
-- 상주 루프는 LoRA 부모 2개, 과제 3종(`arc_easy`, `boolq`, `hellaswag`)만 지원합니다.
+- `lerp search`는 객관식 로그 확률 과제(`acc`, `acc_norm`)만 채점합니다. 생성형(GSM8K, 코드)은 아직 `lerp cycle`과 lm-eval을 써야 합니다.
 - 결과를 인용하기 전에 [비판적 검토](docs/CRITICAL_REVIEW_KO.md)와 [기술 감사](docs/V04_TECHNICAL_AUDIT.md)를 읽어 주세요. 한국어 설치 안내는 [QUICKSTART_KO.md](QUICKSTART_KO.md)에 있습니다.
 
 ## 라이선스

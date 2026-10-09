@@ -77,28 +77,59 @@ lerp cycle -r runs/gp --rounds 3 --engine lora   # 3 + 3 + 3 = 9 evaluations
   The difference between the two final scores is far below the evaluation noise: the gain is cost, not a higher optimum.
 - Synthetic landscape test (`tests/test_gp.py`): with 12 evaluations the GP reaches regret 0.013 against 0.067 for random sampling (wins 12/12 seeds).
 
-## Fast resident loop: seconds per candidate (`examples/fast_merge_eval.py`)
+## `lerp search`: seconds per candidate
 
-Most of the wall-clock time of a normal cycle is not merging or scoring but fixed cost per candidate: writing the adapter, starting `lm-eval`, loading the model and datasets again. For a
-LoRA pair the merged weights are linear, so a single resident process can keep the base model on the accelerator, overwrite the target weights with
-`W0 + sum_i c_i * scale_i * B_i @ A_i` (the same coefficients as `build_lora`, via `tensor_coefficients`) and score the items itself (lm-eval prompts, continuation tokenization and acc / acc_norm).
+A normal `lerp cycle` pays a fixed price per candidate: write the merged weights, start `lm-eval`, load the model and the datasets again. Merging is linear in the weights, so
+`lerp search` keeps one model on the accelerator, overwrites its target tensors with the candidate and scores the items in the same process:
+
+* LoRA pairs: `W = W0 + sum_i c_i * scale_i * B_i @ A_i` (the coefficients `build_lora` uses).
+* Full checkpoints: `W = sum_i c_i * P_i` (or the task-arithmetic form), read tensor by tensor from the parents' safetensors files with fp32 accumulation, cast to the model dtype
+  (the arithmetic of the `lite` engine). Checkpoint names are mapped onto the loaded model, including per-expert tensors that transformers fuses into 3-D parameters and tied weights.
 
 ```bash
-python examples/fast_merge_eval.py --config my-lora.yaml --verify 0.5,0.5,0.5         # compare with lm-eval first
-python examples/fast_merge_eval.py --config my-lora.yaml --limit 300 --budget 30 --strategy gp \n       --validate-limit 300 --out search.json     # GP search + fresh-item validation
+lerp init -c my.yaml -o runs/my && lerp freeze -r runs/my --strict
+lerp search -r runs/my --rounds 6 --baselines --device xpu     # candidates, generations, scores and baselines go in the normal run folder
+lerp board -r runs/my --pareto && lerp compare -r runs/my      # everything downstream works unchanged
+lerp build -r runs/my -g 5 -i 0 --engine lora                  # build only the winner, then: lerp validate ...
 ```
 
-Measured on an Intel Arc 140V (16 GB), 168-252 adapter modules:
+Scores are recorded with source `lerp_eval` (a verified source next to `lm_eval`); `resident_protocol.json` pins the items, dtype, device and task definitions, and a later search
+with different settings is refused so scores never mix. `--baselines` scores the base model and each parent with the same evaluator, which is what `lerp compare` needs.
 
-| model | items per task | Lerp + lm-eval | resident loop |
-|---|---:|---:|---:|
-| Qwen2.5-0.5B | 100 | ~285 s per candidate | 5 s (0.1-0.3 s to merge) |
-| Qwen2.5-0.5B | 300 | - | 14 s |
-| Qwen3-4B | 100 | ~11-14 min | 29 s (2-3 s to merge) |
-| Qwen3-4B | 150 | - | 47 s |
+Safeguards: on startup the session checks `lm_head(base_model(x))` (plus a known soft-cap) against `model(x).logits` and refuses models whose logits it cannot reproduce;
+checkpoint tensors it cannot map onto the loaded model abort with a message instead of being skipped; batches shrink automatically on out-of-memory.
+`search` needs `evaluation.limit`, scores log-likelihood tasks (`acc`, `acc_norm`) only, and bf16 rounding makes a 100-item accuracy move by 1-3 items between batch compositions.
 
-Scores agree with lm-eval within one item per 100 (bf16 numerics). Limits: supports `arc_easy`, `boolq` and `hellaswag` (add a `*_docs` function for other loglikelihood tasks),
-two LoRA parents with the standard layout, and original weights are kept in host RAM (about 2 bytes per adapted weight). It is a search tool: confirm the winner with `lerp validate`.
+Measured on an Intel Arc 140V (16 GB):
+
+| model | kind | items per task | `lm-eval` per candidate | `lerp search` |
+|---|---|---:|---:|---:|
+| Qwen2.5-0.5B | LoRA pair | 100 | ~285 s | 4.3 s |
+| Qwen3-4B | LoRA pair | 100 | ~11-14 min | 29 s |
+| OLMoE-1B-7B | full checkpoints, MoE | 100 | ~10 min (55 s merge + ~8 min eval) | 44 s |
+
+## Declarative tasks
+
+Any log-likelihood multiple-choice benchmark is data: dataset and split, a prompt template, where the choices are and which one is correct. `arc_easy`, `arc_challenge`, `boolq`,
+`hellaswag` and `piqa` are built in; others are a `task:` block in the experiment YAML (see `examples/custom_task.yaml`):
+
+```yaml
+evaluation:
+  tasks:
+    openbookqa:
+      metric: 'acc_norm,none'
+      task:
+        dataset: allenai/openbookqa
+        config: main
+        split: test
+        prompt: "{question_stem}"
+        choices: {field: choices.text}
+        label: {index_of: {value: answerKey, in: choices.label}}
+```
+
+Templates use `{path}` (dotted paths, `[i]` indexes) and the filters `capitalize`, `strip`, `lstrip`, `lower`, `upper`; nothing is evaluated as code. Choices are a list, `{field: ...}`, `{fields: [...]}` or
+`{template: [...]}`; a label is `{field: ...}`, `{index_of: {value: ..., in: ...}}` or `{const: N}`. The built-in definitions and `openbookqa` / `sciq` written this way were compared
+document by document with lm-eval's own conversion (context, choices, correct index) and are identical.
 
 ## Model families and mixture-of-experts
 

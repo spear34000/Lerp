@@ -92,6 +92,13 @@ def create_parser() -> argparse.ArgumentParser:
     automate.add_argument("--device", help="Evaluator device override")
     automate.add_argument("--retry-partial", action="store_true", help="Clean interrupted temporary artifacts on retry")
 
+    seek = commands.add_parser("search", help="Resident cycle: score candidates in seconds with one model kept on the accelerator")
+    seek.add_argument("--run", "-r", type=Path, required=True)
+    seek.add_argument("--rounds", type=int, default=1)
+    seek.add_argument("--device", help="Accelerator override (default: evaluation.device)")
+    seek.add_argument("--dtype", choices=["bfloat16", "float16", "float32"], default="bfloat16")
+    seek.add_argument("--baselines", action="store_true", help="Also score the base model and each parent with the same evaluator")
+
     evaluation = commands.add_parser("evaluate", help="Evaluate one merged checkpoint with EleutherAI lm-eval")
     _candidate_args(evaluation)
     evaluation.add_argument("--device")
@@ -246,6 +253,12 @@ def _run(args: argparse.Namespace) -> int:
         print("Completed generations:", ", ".join(map(str, completed)))
         return 0
 
+    if args.command == "search":
+        from .search import search_run
+        completed = search_run(args.run, args.rounds, device=args.device, dtype=args.dtype, baselines=args.baselines)
+        print("Searched generations:", ", ".join(map(str, completed)))
+        return 0
+
     if args.command == "evaluate":
         value = evaluate_candidate(args.run, args.generation, args.candidate,
                                    device=args.device, overwrite=args.overwrite, retry_partial=args.retry_partial)
@@ -359,7 +372,7 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
     try:
-        mutating = {"freeze", "simulate", "advance", "build", "cycle", "evaluate",
+        mutating = {"freeze", "simulate", "advance", "build", "cycle", "search", "evaluate",
                     "recover", "baseline", "screen", "score", "validate"}
         if args.command in mutating:
             with locked_run(args.run):

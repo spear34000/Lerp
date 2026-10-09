@@ -1,0 +1,39 @@
+# Any log-likelihood multiple-choice benchmark is a `task:` block - no code. These two reproduce lm-eval's openbookqa and sciq
+# (checked document by document against lm-eval). `lerp search` scores them in-process; `lerp cycle` still uses lm-eval task names.
+name: custom-task-demo
+base_model: ./checkpoints/base
+parents:
+  - {name: skill_a, model: ./adapters/skill_a}
+  - {name: skill_b, model: ./adapters/skill_b}
+mode: lora
+method: linear
+selection: weighted
+search: gp
+population: 3
+genes: 3
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: cpu
+  limit: 100
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}            # built in: arc_easy, arc_challenge, boolq, hellaswag, piqa
+    openbookqa:
+      metric: 'acc_norm,none'
+      weight: 1.0
+      task:
+        dataset: allenai/openbookqa
+        config: main
+        split: test
+        prompt: "{question_stem}"
+        choices: {field: choices.text}
+        label: {index_of: {value: answerKey, in: choices.label}}
+    sciq:
+      metric: 'acc_norm,none'
+      weight: 1.0
+      task:
+        dataset: allenai/sciq
+        split: test
+        prompt: "{support|lstrip}\nQuestion: {question}\nAnswer:"
+        choices: {fields: [distractor1, distractor2, distractor3, correct_answer]}
+        label: {const: 3}

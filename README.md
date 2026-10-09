@@ -18,10 +18,10 @@ and a successful merge does not imply a better model: Lerp's job is to find good
 
 ## Why Lerp
 
-- **Seconds per candidate.** A resident loop keeps the base model on the accelerator, writes the blended weights in place and scores the items itself:
-  5 s per candidate for a 0.5B model, 29 s for Qwen3-4B (the same step took ~285 s and ~11-14 min through a fresh `lm-eval` run per candidate).
+- **Seconds per candidate.** `lerp search` keeps one model on the accelerator, writes each blend into it in place and scores the items itself, for LoRA pairs and for full checkpoints (including mixture-of-experts):
+  4 s per candidate for a 0.5B model, 29 s for Qwen3-4B, 44 s for the 6.9B-parameter OLMoE (the same step took ~285 s, ~11-14 min and ~10 min through a fresh `lm-eval` run per candidate).
 - **Sample-efficient search.** Gaussian-process Bayesian search (`search: gp`) reached the same blend quality as evolution with a third of the evaluations; evolution and Pareto selection remain available when you want specialists.
-- **One pipeline across model families.** A single rule table maps tensors to module groups; mixture-of-experts routers and experts, multimodal towers and unfamiliar architectures are handled by configuration (`tensor_rules`), not code.
+- **One pipeline across model families and benchmarks.** A single rule table maps tensors to module groups; mixture-of-experts routers and experts, multimodal towers and unfamiliar architectures are handled by configuration (`tensor_rules`), and any log-likelihood multiple-choice benchmark is a `task:` block in the YAML, not code.
 - **Auditable.** Inputs and outputs are SHA-256 pinned, winners are re-scored on items the search never saw, simulated scores cannot leak into real results, and the docs list what is *not* verified.
 
 ## How it works
@@ -32,7 +32,7 @@ flowchart LR
     B --> C["freeze<br/>SHA-256 pin of every input"]
     C --> D{"search"}
     D -->|"evolution / GP"| E["merge candidate<br/>lite / lora / mergekit"]
-    D -->|"resident loop"| F["blend weights in place<br/>score in seconds"]
+    D -->|"lerp search"| F["blend weights in place<br/>score in seconds"]
     E --> G["lm-eval"]
     G --> H["winner"]
     F --> H
@@ -59,8 +59,9 @@ lerp init   -c my.yaml -o runs/my && lerp freeze -r runs/my --strict
 lerp cycle  -r runs/my --rounds 3 --engine lora      # search: gp  ->  3 + 3 + 3 evaluations
 lerp validate -r runs/my -c examples/holdout_evaluation.yaml --baseline all
 
-# Or the resident loop: seconds per candidate, 300 items per task, fresh-item check at the end
-python examples/fast_merge_eval.py --config my.yaml --limit 300 --budget 30 --strategy gp --validate-limit 300
+# Or search in seconds per candidate: one resident model, blends written in place (LoRA or full checkpoints)
+lerp search -r runs/my --rounds 6 --baselines --device xpu      # scores land in the same run folder
+lerp build  -r runs/my -g 5 -i 0 --engine lora                # materialise only the winner, then validate it
 ```
 
 Windows: set `PYTHONUTF8=1`. More in the [reference manual](docs/REFERENCE.md).
@@ -71,7 +72,7 @@ Small models on one 16 GB Intel Arc machine; sample sizes are 100-300 items per 
 
 | Question | Result |
 |---|---|
-| How fast is the resident loop? | Qwen2.5-0.5B: 285 s → 5 s per candidate. Qwen3-4B: 11-14 min → 29 s (47 s with 150 items per task). Scores match `lm-eval` within one item per 100 |
+| How fast is `lerp search`? | Qwen2.5-0.5B: 285 s → 4 s per candidate. Qwen3-4B: 11-14 min → 29 s. OLMoE-1B-7B (64 experts per layer, full checkpoints): ~10 min → 44 s. Scores match `lm-eval` within 1-3 items per 100 (bf16 rounding depends on batch composition) |
 | Does merging help? | **Only when the skills are complementary.** An ARC LoRA + a BoolQ LoRA (Qwen2.5-0.5B) blend to 0.78 on fresh items against 0.71 / 0.69 for the parents (+0.07, about 3 standard errors). Weak or redundant pairs gave no detectable gain over the better parent |
 | GP vs evolution? | 8 GP evaluations found blends as good as 24 evolution evaluations (fresh-item fitness 0.739 vs 0.741). Evolution did **not** beat plain random search |
 | GP vs random? | Indistinguishable when the weight landscape is a wide plateau (30 evaluations, 300 items). The speed-up comes from the evaluation loop, not from a smarter optimizer |
@@ -92,26 +93,26 @@ Small models on one 16 GB Intel Arc machine; sample sizes are 100-300 items per 
 
 - Ancestry cannot be proven from files: matching configs and shapes do not show that two checkpoints share a base revision.
 - Merged checkpoints larger than ~14 GB cannot be evaluated on a 16 GB GPU without quantization (no GGUF backend yet). Merging itself streams tensor by tensor.
-- The resident loop supports two LoRA parents and the tasks `arc_easy`, `boolq` and `hellaswag`.
+- `lerp search` scores log-likelihood multiple-choice tasks (`acc`, `acc_norm`) only; generative benchmarks (GSM8K, code) still go through `lerp cycle` and lm-eval. It refuses models whose logits it cannot reproduce (checked on startup) and checkpoints whose tensor names it cannot map onto the loaded model.
 - No MergeKit (TIES/DARE) run has been exercised here; quantized sources (GPTQ/AWQ/GGUF) are not supported directly.
 - Read the [critical review](docs/CRITICAL_REVIEW_KO.md) and the [technical audit](docs/V04_TECHNICAL_AUDIT.md) before quoting any result.
 
 ## Repository
 
 ```
-lerp/          package: spec, family rules, lite / lora engines, GP search, integrity, CLI
-examples/      demo configs, PEFT smoke tests, the resident fast_merge_eval loop
+lerp/          package: spec, declarative tasks, family rules, lite / lora engines, resident search, GP, integrity, CLI
+examples/      demo configs (LoRA, GP, declarative tasks), PEFT smoke tests
 experiments/   training, verification and search scripts + RESULTS.md with every table
 docs/          reference manual, architecture, audits
-tests/         124 tests (numerical merge checks, crash recovery, GP, model families)
+tests/         150+ tests (numerical merge checks, crash recovery, GP, model families, resident search against the merge engines)
 ```
 
 ## Roadmap
 
-1. Declarative evaluation tasks (dataset, prompt template, choices in YAML) to lift the three-task limit.
-2. The resident loop for full checkpoints (frozen base on the accelerator, parent difference in host RAM).
-3. A GGUF / llama.cpp evaluation backend so large MoE merges can be scored locally.
-4. Expert-level adapters for fused-expert MoE models.
+1. Generative tasks in the resident evaluator (exact match on extracted answers: GSM8K, code) - the main missing benchmark type.
+2. A GGUF / llama.cpp evaluation backend so large MoE merges can be scored locally.
+3. Expert-level adapters for fused-expert MoE models.
+4. Name mappings for further architectures whose checkpoints differ from the loaded module names.
 
 ## License
 

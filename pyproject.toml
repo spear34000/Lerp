@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerp"
+version = "0.5.0"
+description = "Fast, auditable search for LLM merges: LoRA and full checkpoints, dense, multimodal and mixture-of-experts models"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Lerp Contributors"}]
+dependencies = ["PyYAML>=6.0,<7"]
+
+[project.optional-dependencies]
+merge = ["mergekit"]
+lite = ["torch>=2", "safetensors>=0.4"]
+lora = ["torch>=2", "safetensors>=0.4", "peft>=0.11", "transformers>=4.45"]
+hub = ["huggingface_hub>=0.23"]
+eval = ["lm_eval[hf]"]
+gp = ["numpy"]
+test = ["pytest>=8", "numpy", "torch>=2", "safetensors>=0.4"]
+
+[project.scripts]
+lerp = "lerp.cli:main"
+modelbreeder = "lerp.cli:main"  # legacy command name
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lerp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

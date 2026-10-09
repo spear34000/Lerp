@@ -89,8 +89,8 @@ def create_report(run: Path, out: Path) -> Path:
     best_text = f'{best["score"]["fitness"]:.4f}' if best else '—'
     gen_count = 1 + state["generation"]
     best_baseline = max(baseline_scores.values(), key=lambda d: d["fitness"], default=None)
-    comparable = (best and best_baseline is not None and best["score"].get("source") == "lm_eval"
-                  and best_baseline.get("source") == "lm_eval" and
+    comparable = (best and best_baseline is not None and best["score"].get("source") in ("lm_eval", "lerp_eval")
+                  and best_baseline.get("source") in ("lm_eval", "lerp_eval") and
                   best["score"].get("evaluation_settings") == best_baseline.get("evaluation_settings"))
     baseline_diff = f'{best["score"]["fitness"]-best_baseline["fitness"]:+.4f}' if comparable else '—'
     rows = []

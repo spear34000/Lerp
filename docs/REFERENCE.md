@@ -98,7 +98,7 @@ with different settings is refused so scores never mix. `--baselines` scores the
 
 Safeguards: on startup the session checks `lm_head(base_model(x))` (plus a known soft-cap) against `model(x).logits` and refuses models whose logits it cannot reproduce;
 checkpoint tensors it cannot map onto the loaded model abort with a message instead of being skipped; batches shrink automatically on out-of-memory.
-`search` needs `evaluation.limit`, scores log-likelihood tasks (`acc`, `acc_norm`) only, and bf16 rounding makes a 100-item accuracy move by 1-3 items between batch compositions.
+`search` needs `evaluation.limit`, scores log-likelihood tasks (`acc`, `acc_norm`) and generative tasks (`exact_match`, greedy decoding), and bf16 rounding makes a 100-item accuracy move by 1-3 items between batch compositions.
 
 Measured on an Intel Arc 140V (16 GB):
 
@@ -130,6 +130,33 @@ evaluation:
 Templates use `{path}` (dotted paths, `[i]` indexes) and the filters `capitalize`, `strip`, `lstrip`, `lower`, `upper`; nothing is evaluated as code. Choices are a list, `{field: ...}`, `{fields: [...]}` or
 `{template: [...]}`; a label is `{field: ...}`, `{index_of: {value: ..., in: ...}}` or `{const: N}`. The built-in definitions and `openbookqa` / `sciq` written this way were compared
 document by document with lm-eval's own conversion (context, choices, correct index) and are identical.
+
+### Generative tasks
+
+A task with `generate` and `answer` instead of `choices` and `label` is scored by greedy decoding and exact match. The completion is cut at the first `stop` string, the answer is pulled out
+with the `extract` regex (`pick: last` or `first`) and compared with the gold answer after the `normalize` steps (`strip`, `lower`, `remove_commas`, `remove_dollar`, `strip_period`,
+`collapse_spaces`, `number`). `gsm8k` is built in (zero-shot, last number of the completion); other tasks are a block in the YAML:
+
+```yaml
+evaluation:
+  tasks:
+    gsm8k:
+      metric: 'exact_match,none'
+      task:
+        dataset: openai/gsm8k
+        config: main
+        split: test
+        prompt: "Question: {question}
+Answer:"
+        answer: {field: answer, regex: '#### (-?[0-9.,]+)'}      # gold answer inside the reference solution
+        generate: {max_new_tokens: 256, stop: ['Question:', '</s>']}
+        extract: {regex: '(-?[0-9][0-9,]*\.?[0-9]*)', pick: last}   # answer inside the model's completion
+        normalize: [remove_commas, strip_period, number]
+```
+
+Few-shot examples are part of the `prompt` text. Decoding is greedy, so the same blend gives the same completion, but bf16 batches of different composition can still flip an item; the
+batch size is halved on out-of-memory. Generation takes far longer per candidate than log-likelihood scoring (every new token is a forward pass), so keep `evaluation.limit` small.
+A run with only generative tasks skips the logit self-check, because `generate()` runs the model's own forward pass.
 
 ## Model families and mixture-of-experts
 

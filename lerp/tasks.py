@@ -29,7 +29,17 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
-_ALLOWED_KEYS = {"dataset", "config", "split", "prompt", "choices", "label", "clean"}
+_ALLOWED_KEYS = {"dataset", "config", "split", "prompt", "choices", "label", "clean", "answer", "generate", "extract", "normalize"}
+_GENERATE_KEYS = {"max_new_tokens", "stop"}
+_NORMALIZERS = {
+    "strip": str.strip,
+    "lower": str.lower,
+    "remove_commas": lambda t: t.replace(",", ""),
+    "remove_dollar": lambda t: t.replace("$", ""),
+    "strip_period": lambda t: t.strip().rstrip("."),
+    "collapse_spaces": lambda t: " ".join(t.split()),
+    "number": lambda t: _canonical_number(t),
+}
 _TOKEN = re.compile(r"\{([A-Za-z_][\w.\[\]]*)(?:\|(\w+))?\}")
 _STEP = re.compile(r"([A-Za-z_]\w*)((?:\[\d+\])*)")
 _FILTERS = {"capitalize": str.capitalize, "strip": str.strip, "lstrip": str.lstrip, "lower": str.lower, "upper": str.upper}
@@ -37,6 +47,16 @@ _FILTERS = {"capitalize": str.capitalize, "strip": str.strip, "lstrip": str.lstr
 
 class TaskError(ValueError):
     pass
+
+
+def _canonical_number(text: str) -> str:
+    """'18.00' -> '18', '1,000' -> '1000'; anything that is not a plain number is returned unchanged."""
+    cleaned = text.strip().replace(",", "")
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return text
+    return str(int(value)) if value == int(value) else repr(value)
 
 
 def _hellaswag_clean(text: str) -> str:
@@ -71,6 +91,14 @@ BUILTIN_TASKS: dict[str, dict[str, Any]] = {
         "choices": {"field": "endings"},
         "label": {"field": "label"},
         "clean": "hellaswag",
+    },
+    "gsm8k": {
+        "dataset": "openai/gsm8k", "config": "main", "split": "test",
+        "prompt": "Question: {question}\nAnswer:",
+        "answer": {"field": "answer", "regex": "#### (-?[0-9.,]+)"},
+        "generate": {"max_new_tokens": 256, "stop": ["Question:", "</s>", "<|im_end|>"]},
+        "extract": {"regex": "(-?[0-9][0-9,]*\\.?[0-9]*)", "pick": "last"},
+        "normalize": ["remove_commas", "strip_period", "number"],
     },
     "piqa": {
         "dataset": "baber/piqa", "config": None, "split": "validation",
@@ -126,6 +154,46 @@ class TaskDefinition:
     label: Any
     config: str | None = None
     clean: str | None = None
+    answer: Any = None
+    generate: Any = None
+    extract: Any = None
+    normalize: tuple = ()
+
+    @property
+    def generative(self) -> bool:
+        return self.generate is not None
+
+    def convert_generative(self, doc: Any) -> tuple[str, str]:
+        """One dataset row -> (prompt, normalized gold answer)."""
+        prompt = render(self.prompt, doc)
+        spec = self.answer
+        raw = str(_lookup(doc, spec["field"])) if "field" in spec else render(spec["template"], doc)
+        if spec.get("regex"):
+            found = re.search(spec["regex"], raw)
+            if not found:
+                raise TaskError(f"task {self.name}: answer regex {spec['regex']!r} does not match {raw[-60:]!r}")
+            raw = found.group(1) if found.groups() else found.group(0)
+        return prompt, self.normalized(raw)
+
+    def normalized(self, text: str) -> str:
+        for name in self.normalize:
+            text = _NORMALIZERS[name](text)
+        return text.strip()
+
+    def extract_answer(self, generated: str) -> str:
+        """Cut at the first stop string, pull the answer out with the extract regex, normalize it."""
+        for stop in (self.generate or {}).get("stop", []):
+            at = generated.find(stop)
+            if at >= 0:
+                generated = generated[:at]
+        spec = self.extract or {}
+        if spec.get("regex"):
+            found = list(re.finditer(spec["regex"], generated))
+            if not found:
+                return ""
+            match = found[-1] if spec.get("pick", "last") == "last" else found[0]
+            generated = match.group(1) if match.groups() else match.group(0)
+        return self.normalized(generated)
 
     def convert(self, doc: Any) -> tuple[str, list[str], int]:
         """One dataset row -> (context, choice strings, index of the correct choice)."""
@@ -158,8 +226,9 @@ class TaskDefinition:
             raise TaskError(f"task {self.name}: label {label} outside {len(choices)} choices")
         return context, choices, label
 
-    def documents(self, lo: int, hi: int, rows: Sequence[Any] | None = None) -> list[tuple[str, list[str], int]]:
+    def documents(self, lo: int, hi: int, rows: Sequence[Any] | None = None) -> list[tuple]:
         """Converted rows ``lo <= i < hi``. ``rows`` lets tests (and offline users) supply the dataset directly."""
+        convert = self.convert_generative if self.generative else self.convert
         if rows is None:
             try:
                 from datasets import load_dataset
@@ -167,8 +236,8 @@ class TaskDefinition:
                 raise TaskError('Install datasets for dataset-backed tasks: pip install datasets') from exc
             data = load_dataset(self.dataset, self.config, split=self.split)
             rows = data.select(range(min(lo, len(data)), min(hi, len(data))))
-            return [self.convert(row) for row in rows]
-        return [self.convert(row) for row in list(rows)[lo:hi]]
+            return [convert(row) for row in rows]
+        return [convert(row) for row in list(rows)[lo:hi]]
 
 
 def validate_definition(name: str, definition: dict) -> None:
@@ -177,9 +246,15 @@ def validate_definition(name: str, definition: dict) -> None:
     unknown = set(definition) - _ALLOWED_KEYS
     if unknown:
         raise TaskError(f"task {name}: unknown keys {sorted(unknown)}")
-    for key in ("dataset", "split", "prompt", "choices", "label"):
+    generative = "generate" in definition or "answer" in definition
+    required = ("dataset", "split", "prompt", "generate", "answer") if generative else ("dataset", "split", "prompt", "choices", "label")
+    for key in required:
         if key not in definition:
             raise TaskError(f"task {name}: missing required key {key!r}")
+    if generative:
+        _validate_generative(name, definition)
+        _check_template(name, definition["prompt"])
+        return
     choices = definition["choices"]
     if not (isinstance(choices, list) and choices or isinstance(choices, dict) and len(choices) == 1
             and next(iter(choices)) in ("field", "fields", "template")):
@@ -198,6 +273,38 @@ def validate_definition(name: str, definition: dict) -> None:
         templates += list(choices["template"])
     for text in templates:
         _check_template(name, text)
+
+
+def _validate_generative(name: str, definition: dict) -> None:
+    for key in ("choices", "label", "clean"):
+        if key in definition:
+            raise TaskError(f"task {name}: {key!r} belongs to multiple-choice tasks, not generative ones")
+    gen = definition["generate"]
+    if not isinstance(gen, dict) or set(gen) - _GENERATE_KEYS:
+        raise TaskError(f"task {name}: generate accepts only {sorted(_GENERATE_KEYS)}")
+    tokens = gen.get("max_new_tokens", 256)
+    if not isinstance(tokens, int) or isinstance(tokens, bool) or not 1 <= tokens <= 2048:
+        raise TaskError(f"task {name}: generate.max_new_tokens must be an integer between 1 and 2048")
+    stop = gen.get("stop", [])
+    if not isinstance(stop, list) or not all(isinstance(x, str) and x for x in stop):
+        raise TaskError(f"task {name}: generate.stop must be a list of non-empty strings")
+    answer = definition["answer"]
+    if not isinstance(answer, dict) or set(answer) - {"field", "template", "regex"} or not (("field" in answer) ^ ("template" in answer)):
+        raise TaskError(f"task {name}: answer must be {{field|template: ..., regex: optional}}")
+    extract = definition.get("extract") or {}
+    if not isinstance(extract, dict) or set(extract) - {"regex", "pick"} or extract.get("pick", "last") not in ("first", "last"):
+        raise TaskError(f"task {name}: extract must be {{regex: ..., pick: first|last}}")
+    for pattern in (answer.get("regex"), extract.get("regex")):
+        if pattern is not None:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise TaskError(f"task {name}: bad regex {pattern!r}: {exc}") from exc
+    norm = definition.get("normalize", [])
+    if not isinstance(norm, list) or any(n not in _NORMALIZERS for n in norm):
+        raise TaskError(f"task {name}: normalize must be a list drawn from {sorted(_NORMALIZERS)}")
+    if "template" in answer:
+        _check_template(name, answer["template"])
 
 
 def _check_template(name: str, text: Any) -> None:
@@ -223,14 +330,15 @@ def resolve_task(name: str, definition: dict | str | None = None) -> TaskDefinit
     validate_definition(name, definition)
     return TaskDefinition(
         name=name, dataset=definition["dataset"], split=definition["split"], prompt=definition["prompt"],
-        choices=definition["choices"], label=definition["label"], config=definition.get("config"),
-        clean=definition.get("clean"),
+        choices=definition.get("choices"), label=definition.get("label"), config=definition.get("config"),
+        clean=definition.get("clean"), answer=definition.get("answer"), generate=definition.get("generate"),
+        extract=definition.get("extract"), normalize=tuple(definition.get("normalize", ())),
     )
 
 
 def metric_kind(metric: str) -> str:
-    """'acc_norm,none' -> 'acc_norm'. Only acc and acc_norm are computed by the resident evaluator."""
+    """'acc_norm,none' -> 'acc_norm'. The resident evaluator computes acc / acc_norm (choice tasks) and exact_match (generative)."""
     kind = metric.split(",")[0]
-    if kind not in ("acc", "acc_norm"):
-        raise TaskError(f"metric {metric!r} is not supported by the resident evaluator (use acc or acc_norm)")
+    if kind not in ("acc", "acc_norm", "exact_match"):
+        raise TaskError(f"metric {metric!r} is not supported by the resident evaluator (use acc, acc_norm or exact_match)")
     return kind

@@ -93,7 +93,7 @@ Small models on one 16 GB Intel Arc machine; sample sizes are 100-300 items per 
 
 - Ancestry cannot be proven from files: matching configs and shapes do not show that two checkpoints share a base revision.
 - Merged checkpoints larger than ~14 GB cannot be evaluated on a 16 GB GPU without quantization (no GGUF backend yet). Merging itself streams tensor by tensor.
-- `lerp search` scores log-likelihood multiple-choice tasks (`acc`, `acc_norm`) only; generative benchmarks (GSM8K, code) still go through `lerp cycle` and lm-eval. It refuses models whose logits it cannot reproduce (checked on startup) and checkpoints whose tensor names it cannot map onto the loaded model.
+- `lerp search` scores log-likelihood multiple-choice tasks (`acc`, `acc_norm`) and greedy-decoded generative tasks (`exact_match`, e.g. GSM8K; code execution is not supported). It refuses models whose logits it cannot reproduce (checked on startup) and checkpoints whose tensor names it cannot map onto the loaded model.
 - No MergeKit (TIES/DARE) run has been exercised here; quantized sources (GPTQ/AWQ/GGUF) are not supported directly.
 - Read the [critical review](docs/CRITICAL_REVIEW_KO.md) and the [technical audit](docs/V04_TECHNICAL_AUDIT.md) before quoting any result.
 
@@ -109,7 +109,7 @@ tests/         150+ tests (numerical merge checks, crash recovery, GP, model fam
 
 ## Roadmap
 
-1. Generative tasks in the resident evaluator (exact match on extracted answers: GSM8K, code) - the main missing benchmark type.
+1. Code-execution tasks (HumanEval, MBPP) in the resident evaluator.
 2. A GGUF / llama.cpp evaluation backend so large MoE merges can be scored locally.
 3. Expert-level adapters for fused-expert MoE models.
 4. Name mappings for further architectures whose checkpoints differ from the loaded module names.

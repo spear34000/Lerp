@@ -60,7 +60,7 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 
 - 파일만으로는 두 체크포인트가 같은 베이스에서 나왔는지 증명할 수 없습니다.
 - 약 14GB를 넘는 병합본은 양자화 없이는 16GB GPU에서 평가할 수 없습니다(GGUF 백엔드 미구현). 병합 자체는 텐서 단위 스트리밍이라 가능합니다.
-- `lerp search`는 객관식 로그 확률 과제(`acc`, `acc_norm`)만 채점합니다. 생성형(GSM8K, 코드)은 아직 `lerp cycle`과 lm-eval을 써야 합니다.
+- `lerp search`는 객관식 로그 확률 과제(`acc`, `acc_norm`)와 greedy 디코딩 생성형 과제(`exact_match`, 예: GSM8K)를 채점합니다. 코드 실행(HumanEval, MBPP)은 아직 지원하지 않습니다.
 - 결과를 인용하기 전에 [비판적 검토](docs/CRITICAL_REVIEW_KO.md)와 [기술 감사](docs/V04_TECHNICAL_AUDIT.md)를 읽어 주세요. 한국어 설치 안내는 [QUICKSTART_KO.md](QUICKSTART_KO.md)에 있습니다.
 
 ## 라이선스

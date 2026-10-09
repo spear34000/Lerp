@@ -18,6 +18,7 @@ def main() -> None:
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--items", type=int, default=30)
     ap.add_argument("--tokens", type=int, default=256)
+    ap.add_argument("--dtype", default="bfloat16")
     args = ap.parse_args()
     task = {"dataset": "openai/gsm8k", "config": "main", "split": "test", "prompt": "Question: {question}\nAnswer:",
             "answer": {"field": "answer", "regex": "#### (-?[0-9.,]+)"},
@@ -28,7 +29,7 @@ def main() -> None:
                        "gene_groups": ["attention", "mlp", "other"], "population": 3,
                        "mode": args.mode, "parents": [{"name": n, "model": m} for n, m in (x.split("=", 1) for x in args.parent)],
                        "evaluation": {"limit": args.items, "tasks": {"gsm8k": {"metric": "exact_match,none", "task": task}}}})
-    session = ResidentSession(spec, args.device, "bfloat16")
+    session = ResidentSession(spec, args.device, args.dtype)
     window = (0, args.items)
     for name in [p.name for p in spec.parents]:
         t0 = time.time()

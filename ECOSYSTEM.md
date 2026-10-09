@@ -14,7 +14,7 @@ pipeline, and supporting a *new* family means writing configuration, not code. T
 | LoRA merge | exact rank concatenation | PEFT adapters with the standard linear layout | Qwen2.5-0.5B, Qwen3-4B |
 | LoRA training targets | `targets.discover`: attention + dense MLP of the language model; skips experts, routers, towers, head | same rules as the merger | probed on 6 architectures without weights |
 | Search | evolution or GP + expected improvement over module-group weights | none | evolution = 24 evals, GP = 8 evals for the same quality |
-| Evaluation | lm-eval through `lerp`, or the resident loop (`examples/fast_merge_eval.py`) | task format function per benchmark | 3 tasks in the resident loop |
+| Evaluation | lm-eval through `lerp cycle`, or `lerp search` (resident, in-process) | a `task:` block per benchmark (no code) | 5 built-in tasks; openbookqa and sciq reproduced from config blocks |
 
 ## Adding a new family
 
@@ -29,6 +29,7 @@ pipeline, and supporting a *new* family means writing configuration, not code. T
 - Fused expert parameters (Gemma 4 26B-A4B stores experts as one 3-D parameter, not `nn.Linear`) are merged but cannot receive LoRA through PEFT's module targeting.
 - Merged MoE checkpoints above ~14 GB cannot be loaded for evaluation on a 16 GB GPU / 31 GB RAM machine without quantization (a GGUF + llama.cpp backend is the missing piece).
 - Router interpolation has no quality guarantee; give it its own gene group and let the search decide.
-- The resident evaluation loop supports two LoRA parents and three tasks; a declarative task definition (dataset, split, prompt template, choices, label) would remove that limit.
+- `lerp search` scores log-likelihood multiple-choice tasks only; generative benchmarks (GSM8K, code) need an exact-match scorer with generation.
+- Resident full-checkpoint blending maps checkpoint names onto the loaded model; per-expert -> fused experts and tied weights are handled, other renamings abort with a message and need a mapping.
 - Quantized sources (GPTQ/AWQ/GGUF) must be dequantized first; there is no direct support.
 - Training beyond LoRA (full fine-tuning, DPO, MoE expert adapters) is not wired in.

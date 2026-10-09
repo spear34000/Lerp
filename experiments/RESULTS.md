@@ -196,3 +196,23 @@ OLMoE-1B-7B base + Instruct (64 experts/layer, top-8), `lite` engine, per-group 
 3,219 tensors, 12.9 GiB, 55 s; groups: attention 112, mlp 3,072, router 16, other 19; worst relative error per group 1.6e-3..2.1e-3.
 Child loads on the 16 GB XPU and generates. lm-eval (100 items, acc_norm; fitness = mean - 0.1 * gap): base 0.730 / 0.680 (0.700), Instruct 0.770 / 0.750 (0.758), merged 0.740 / 0.710 (0.722).
 The merge sits between its parents. The 100-item standard error is ~0.045, so the order inside that band is not established.
+
+
+---
+
+# `lerp search`: the resident evaluator inside the product (2026-10-10)
+
+Declarative tasks (`lerp/tasks.py`): arc_easy, arc_challenge, boolq, hellaswag and piqa built in; openbookqa and sciq written only as YAML `task:` blocks. All seven compared with lm-eval's own
+document conversion (context, choices, correct index) on 40 real documents each: identical.
+
+Resident engine (`lerp/resident.py`, `lerp search`): LoRA blending and full-checkpoint blending (linear and task arithmetic), per-expert -> fused-expert name mapping, tied weights, startup self-check,
+out-of-memory backoff. Verified with tiny offline models against the merge engines' own output (dense, task arithmetic, LoRA, MoE; logits equal to 1e-6 / 1e-4) and against a brute-force log-likelihood scorer.
+
+Real models on the Intel Arc 140V:
+- Qwen2.5-0.5B, ARC LoRA + BoolQ LoRA, GP, 3 generations of 3 + 3 baselines, 100 items per task: 12 scorings in 90 s including model load, 4.3 s per candidate.
+  Candidate (0.25 everywhere): lerp 0.73 / 0.77 vs lm-eval 0.73 / 0.78; (0.5): 0.72 / 0.74 vs 0.71 / 0.73. `board`, `compare` (vs resident baselines), `report`, `build`, `status` work on the run.
+- OLMoE-1B-7B base + Instruct (64 experts per layer, 12.9 GiB), weights attention 0.9 / experts 0.1 / router 0.6 / other 0.3: session start 64 s; per candidate 44 s (30 s to write the weights, 14 s to score) vs about 10 min
+  through merge + lm-eval. Scores 0.73 / 0.70 vs lm-eval 0.74 / 0.71 (another batch composition gave 0.75 / 0.71: bf16 rounding moves 100-item accuracies by 1-3 items). Base 0.74 / 0.69 (lm-eval 0.73 / 0.68), Instruct 0.74 / 0.74 (lm-eval 0.77 / 0.75).
+
+Bugs found by running it on real models: the first self-check compared different batch shapes and produced a false alarm (bf16 logits are quantized to 0.125 at magnitude 16-32); it now compares
+`lm_head(base_model(x))` with `model(x).logits` on the identical batch. Stacking experts on the host cut the weight-writing time from 78 s to 30 s; fp32 temporaries for a whole layer ran out of memory on the 16 GB device, so experts are processed in groups.

@@ -216,3 +216,19 @@ Real models on the Intel Arc 140V:
 
 Bugs found by running it on real models: the first self-check compared different batch shapes and produced a false alarm (bf16 logits are quantized to 0.125 at magnitude 16-32); it now compares
 `lm_head(base_model(x))` with `model(x).logits` on the identical batch. Stacking experts on the host cut the weight-writing time from 78 s to 30 s; fp32 temporaries for a whole layer ran out of memory on the 16 GB device, so experts are processed in groups.
+
+## Generative scoring in the resident evaluator (GSM8K, Qwen2.5-0.5B + ARC LoRA)
+
+`lerp/generative.py`: greedy decoding of a fixed window, stop strings, answer extraction by regex, exact match. Zero-shot GSM8K, first 30 test items, 256 new tokens, bf16 on the Arc 140V
+(`experiments/gen_check.py`).
+
+| scorer | exact match | note |
+|---|---:|---|
+| `lerp` resident, ARC LoRA | 0.100 (3/30) | |
+| `lm-eval` gsm8k, flexible-extract, same adapter, `max_gen_toks=256` | 0.100 +/- 0.056 | strict-match 0.000 (a zero-shot base model does not write `####`) |
+| `lerp` resident, PIQA LoRA / 0.5 blend | 0.067 / 0.000 | |
+
+Agreement with lm-eval is exact on this one comparison, but 3 correct answers out of 30 cannot tell scorers (or models) apart; this is a plumbing check, not a measurement of merge quality.
+Batched left-padded decoding against one-prompt-at-a-time decoding: 4/4 identical extracted answers in float32, 2/4 in bf16. The difference is numerical (a different batch shape changes bf16 rounding and a
+greedy decode of 128+ tokens diverges after one flipped token), so generative scores carry batch-composition noise on top of the sampling error. The first candidate of a session takes several minutes (warm-up
+kernels), later ones 7-30 s for 8-30 prompts. The tiny-model tests pin the padding logic (batched = single in float32, any batch size).

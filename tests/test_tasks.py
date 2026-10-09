@@ -78,7 +78,7 @@ def test_documents_slice_supplied_rows():
 def test_metric_kind():
     assert metric_kind("acc_norm,none") == "acc_norm" and metric_kind("acc") == "acc"
     with pytest.raises(TaskError):
-        metric_kind("exact_match,strict")
+        metric_kind("f1,none")
 
 
 def test_spec_carries_and_round_trips_a_declarative_task():

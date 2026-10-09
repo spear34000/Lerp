@@ -68,11 +68,12 @@ class Scorer:
         if not spec.evaluation.tasks:
             raise ResidentError("No evaluation.tasks configured")
         self.window = (lo, hi)
-        self.kinds = {t.name: metric_kind(t.metric) for t in spec.evaluation.tasks}
+        choice_tasks = [t for t in spec.evaluation.tasks if not resolve_task(t.name, t.definition).generative]
+        self.kinds = {t.name: metric_kind(t.metric) for t in choice_tasks}
         self.requests: list[tuple[str, int, int, list[int], list[int]]] = []  # (task, doc, choice, context ids, continuation ids)
         self.gold: dict[tuple[str, int], int] = {}
         self.char_len: dict[tuple[str, int, int], float] = {}
-        for task in spec.evaluation.tasks:
+        for task in choice_tasks:
             definition = resolve_task(task.name, task.definition)
             docs = definition.documents(lo, hi, rows=None if rows is None else rows[task.name])
             if not docs:
@@ -376,7 +377,9 @@ class ResidentSession:
         self.max_length = min(int(max_pos), 8192)
         self.blender = (LoraBlender if spec.mode == "lora" else CheckpointBlender)(spec, self.model, self.device)
         self._scorers: dict[tuple[int, int], Scorer] = {}
+        self._gen_scorers: dict[tuple[int, int], Any] = {}
         self._token_budget: int | None = None
+        self._gen_batch = 16
         if not trust_self_check:
             self._self_check()
 
@@ -390,6 +393,55 @@ class ResidentSession:
             self._scorers[window] = Scorer(self.spec, self.tokenizer, *window, add_special_tokens="gemma" in self.model_type,
                                            max_length=self.max_length, rows=self.rows)
         return self._scorers[window]
+
+    def _generative(self, window: tuple[int, int]):
+        if window not in self._gen_scorers:
+            from .generative import GenerativeScorer
+            self._gen_scorers[window] = GenerativeScorer(
+                self.spec, self.tokenizer, *window, add_special_tokens="gemma" in self.model_type,
+                max_length=self.max_length, rows=self.rows)
+        return self._gen_scorers[window]
+
+    def _generate_batch(self, gen, batch: list[int]) -> list[str]:
+        torch = _torch()
+        width = max(len(gen.items[i][2]) for i in batch)
+        ids = torch.full((len(batch), width), gen.pad_id(), dtype=torch.long)
+        mask = torch.zeros(len(batch), width, dtype=torch.long)
+        for row, i in enumerate(batch):  # left padding: generation continues from the last real token
+            seq = gen.items[i][2]
+            ids[row, width - len(seq):] = torch.tensor(seq)
+            mask[row, width - len(seq):] = 1
+        limits = gen.tasks[gen.items[batch[0]][0]].generate
+        out = self.model.generate(
+            input_ids=ids.to(self.device), attention_mask=mask.to(self.device), do_sample=False, temperature=None, top_p=None,
+            top_k=None, max_new_tokens=limits.get("max_new_tokens", 256), pad_token_id=gen.pad_id(),
+            stop_strings=limits.get("stop") or None, tokenizer=self.tokenizer if limits.get("stop") else None)
+        return self.tokenizer.batch_decode(out[:, width:], skip_special_tokens=True)
+
+    def _score_generative(self, window: tuple[int, int]) -> dict[str, float]:
+        """Greedy completions of the window's prompts. The batch size halves on out-of-memory and is kept for later candidates."""
+        torch = _torch()
+        gen = self._generative(window)
+        if not gen:
+            return {}
+        size = min(self._gen_batch, len(gen.items))
+        while True:
+            texts: dict[int, str] = {}
+            try:
+                with torch.no_grad():
+                    for batch in gen.batches(size):
+                        for i, text in zip(batch, self._generate_batch(gen, batch)):
+                            texts[i] = text
+                return gen.accuracy(texts)
+            except RuntimeError as exc:
+                if not _is_out_of_memory(exc):
+                    raise
+                self._release_cache()
+                if size == 1:
+                    raise ResidentError("out of accelerator memory even generating one sequence at a time; "
+                                        "use a smaller model or fewer new tokens") from None
+                size = max(1, size // 2)
+                self._gen_batch = size
 
     def _pad(self, scorer: Scorer, batch: list[int]):
         torch = _torch()
@@ -436,6 +488,8 @@ class ResidentSession:
         resident path then refuses to score instead of returning plausible but wrong accuracies."""
         torch = _torch()
         scorer = self._scorer((0, min(2, self.spec.evaluation.limit or 2)))
+        if not scorer.requests:  # only generative tasks: generate() runs the model's own forward pass
+            return
         batch = scorer.order[:3]
         ids, mask = self._pad(scorer, batch)
         with torch.no_grad():
@@ -456,6 +510,9 @@ class ResidentSession:
         for activations), and the smaller size is remembered for the rest of the session."""
         torch = _torch()
         scorer = self._scorer(window)
+        metrics = self._score_generative(window)
+        if not scorer.requests:
+            return metrics
         max_tokens = min(max_tokens, self._token_budget or max_tokens)
         while True:
             loglik: dict[int, float] = {}
@@ -464,7 +521,7 @@ class ResidentSession:
                     for batch in scorer.batches(max_tokens):
                         for i, value in zip(batch, self._logprobs(scorer, batch)):
                             loglik[i] = value
-                return scorer.accuracy(loglik)
+                return {**scorer.accuracy(loglik), **metrics}
             except RuntimeError as exc:
                 if not _is_out_of_memory(exc):
                     raise
@@ -512,5 +569,6 @@ class ResidentSession:
                 (t.definition or json.dumps(dataclasses.asdict(resolve_task(t.name)), sort_keys=True)).encode("utf-8")).hexdigest()}
                 for t in self.spec.evaluation.tasks},
             "requests": len(scorer.requests), "tokens": scorer.tokens, "softcap": self.softcap,
+            "generation": {"decoding": "greedy", "prompts": len(self._generative(window).items)},
             "versions": {"torch": torch.__version__, "transformers": tf_version, "python": platform.python_version()},
         }

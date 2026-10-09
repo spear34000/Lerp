@@ -1,0 +1,24 @@
+# Offline-only demo. These references are deliberately invalid; simulate uses a
+# mathematical toy objective, NOT AI metrics or downloaded model weights.
+name: multi-parent-pareto-DEMO
+base_model: fictional/base
+parents:
+  - {name: code, model: fictional/code-ft}
+  - {name: math, model: fictional/math-ft}
+  - {name: korean, model: fictional/korean-ft}
+method: ties
+selection: pareto
+population: 12
+genes: 8
+mutation_sigma: 0.08
+seed: 2026
+out_dtype: bfloat16
+density: 0.50
+evaluation:
+  device: cpu
+  batch_size: 1
+  limit: 10
+  num_fewshot: 0
+  tasks:
+    coding: {metric: "acc_norm,none", weight: 1.0}
+    reasoning: {metric: "acc_norm,none", weight: 1.0}

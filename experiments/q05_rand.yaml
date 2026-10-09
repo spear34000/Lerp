@@ -1,0 +1,25 @@
+# Evolution vs random search on Qwen2.5-0.5B: ARC-Easy LoRA + PIQA LoRA. Search items: first 100 of each task.
+name: q05-rand
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen2.5-0.5B
+parents:
+  - {name: arc, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/arc}
+  - {name: piqa, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_trained/piqa}
+mode: lora
+method: linear
+selection: pareto
+population: 30
+genes: 3
+mutation_sigma: 0.15
+seed: 21
+out_dtype: float32
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: xpu
+  batch_size: 8
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: 100
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    piqa: {metric: 'acc_norm,none', weight: 1.0}

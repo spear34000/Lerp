@@ -1,0 +1,24 @@
+# Gemma 4 E4B: interpolate the pretrained checkpoint (pt) and the instruction-tuned one (it).
+name: gemma4-e4b-pt-it
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/gemma-4-E4B
+parents:
+  - {name: pt, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/gemma-4-E4B}
+  - {name: it, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/gemma-4-E4B-it}
+mode: full
+method: linear
+selection: pareto
+population: 4
+genes: 3
+mutation_sigma: 0.15
+seed: 11
+out_dtype: bfloat16
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: cpu
+  batch_size: 1
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: 30
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

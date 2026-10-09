@@ -1,0 +1,14 @@
+# Deliberately incompatible: Qwen3 base with Gemma 4 parents. The tool must refuse.
+name: cross-family-negative
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B-Base
+parents:
+  - {name: gpt, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/gemma-4-E4B}
+  - {name: git, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/gemma-4-E4B-it}
+method: linear
+population: 4
+genes: 3
+evaluation:
+  device: cpu
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

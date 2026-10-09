@@ -1,0 +1,10 @@
+# Separate from the evolutionary selection tasks. Choose truly independent data.
+evaluation:
+  device: cpu
+  batch_size: 1
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: null        # use whole benchmark task; no short smoke-test sample limit
+  tasks:
+    piqa: {metric: 'acc_norm,none', weight: 1.0}
+    winogrande: {metric: 'acc,none', weight: 1.0}

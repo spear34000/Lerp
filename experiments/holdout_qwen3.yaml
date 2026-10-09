@@ -1,0 +1,10 @@
+# Different task names from the search tasks (piqa / winogrande).
+evaluation:
+  device: xpu
+  batch_size: 8
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: 100
+  tasks:
+    piqa: {metric: 'acc_norm,none', weight: 1.0}
+    winogrande: {metric: 'acc,none', weight: 1.0}

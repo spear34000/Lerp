@@ -1,0 +1,25 @@
+# GP search over module-group merge weights of two LoRA adapters trained on the same base.
+# Replace the paths. Needs: pip install -e ".[lora,gp,eval]"
+name: gp-demo
+base_model: ./checkpoints/base
+parents:
+  - {name: skill_a, model: ./adapters/skill_a}
+  - {name: skill_b, model: ./adapters/skill_b}
+mode: lora
+method: linear
+selection: weighted
+search: gp
+population: 3
+genes: 3
+seed: 7
+out_dtype: float32
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: cpu
+  batch_size: 8
+  num_fewshot: 0
+  limit: 100
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    boolq: {metric: 'acc,none', weight: 1.0}

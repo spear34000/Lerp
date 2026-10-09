@@ -1,0 +1,27 @@
+# Qwen3-4B-Base + two LoRAs trained on disjoint TRAIN splits (arc_easy / hellaswag).
+name: qwen3-4b-trained-lora
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B-Base
+parents:
+  - {name: arc, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_q3/arc}
+  - {name: hellaswag, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/adapters_q3/hellaswag}
+mode: lora
+method: linear
+selection: pareto
+population: 4
+genes: 3
+mutation_sigma: 0.15
+seed: 7
+out_dtype: float32
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: xpu
+  batch_size: 8
+  num_fewshot: 0
+  apply_chat_template: false
+  screening_limit: 20
+  promote_top: 2
+  limit: 100
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

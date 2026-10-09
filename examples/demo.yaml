@@ -1,0 +1,19 @@
+# Synthetic demonstration ONLY: these are not actual Hugging Face repositories.
+# Do not try lerp build on them.
+name: offline-demo
+base_model: not-a-real-org/base
+parents:
+  - name: alpha
+    model: not-a-real-org/alpha
+  - name: beta
+    model: not-a-real-org/beta
+method: linear
+population: 6
+genes: 6
+mutation_sigma: 0.12
+seed: 42
+out_dtype: bfloat16
+evaluation:
+  tasks:
+    arc_easy: {metric: "acc_norm,none", weight: 1}
+    hellaswag: {metric: "acc_norm,none", weight: 1}

@@ -1,0 +1,29 @@
+# Example requires real local PEFT LoRA adapter folders and compatible base model.
+name: lora-multiskill-experiment
+base_model: ./checkpoints/base
+parents:
+  - {name: code, model: ./adapters/code}
+  - {name: math, model: ./adapters/math}
+  - {name: korean, model: ./adapters/korean}
+mode: lora
+method: auto
+search_methods: [linear, task_arithmetic]
+selection: pareto
+population: 6
+genes: 4
+mutation_sigma: 0.10
+seed: 20261008
+out_dtype: bfloat16
+task_scale: 0.75
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: cpu
+  batch_size: 1
+  num_fewshot: 0
+  apply_chat_template: false
+  screening_limit: 15
+  promote_top: 3
+  limit: 250
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

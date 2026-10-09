@@ -1,0 +1,32 @@
+# Replace the three model references with checkpoints of the same architecture
+# and actual common ancestry. Avoid GGUF/GPTQ/AWQ checkpoint paths: use HF weights.
+name: kern-breeding-01
+base_model: ./models/base
+parents:
+  - name: code
+    model: ./models/code-ft
+  - name: reason
+    model: ./models/reason-ft
+method: linear                  # linear | task_arithmetic | ties | dare_ties | dare_linear
+selection: pareto               # pareto | weighted
+population: 6                  # candidate models per generation
+genes: 6                       # interpolation control points across layers
+mutation_sigma: 0.12
+seed: 42
+out_dtype: bfloat16             # float16 | bfloat16 | float32
+density: 0.5                    # used only by ties / dare_ties / dare_linear
+task_scale: 1.0                 # lambda for base-relative task methods
+evaluation:
+  device: cpu                   # cuda:0 only with working CUDA GPU
+  batch_size: 1
+  limit: 30                     # smoke test; omit for full evaluation
+  penalty: 0.1                  # penalizes imbalance across tasks
+  num_fewshot: 0
+  apply_chat_template: false
+  tasks:
+    arc_easy:
+      metric: acc_norm,none
+      weight: 1
+    hellaswag:
+      metric: acc_norm,none
+      weight: 1

@@ -1,0 +1,25 @@
+# Full-checkpoint GP search: Qwen3-4B (post-trained) <-> Qwen3-4B-Base, lite engine on CPU, scored on XPU.
+name: q3-4b-full-gp
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B-Base
+parents:
+  - {name: posttrained, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B}
+  - {name: pretrained, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen3-4B-Base}
+mode: full
+method: linear
+selection: weighted
+search: gp
+population: 3
+genes: 3
+seed: 3
+out_dtype: bfloat16
+gene_groups: [attention, mlp, other]
+evaluation:
+  device: xpu
+  batch_size: 8
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: 40
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

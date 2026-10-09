@@ -1,0 +1,24 @@
+# OLMoE-1B-7B (64 experts/layer, top-8): post-trained <-> pretrained. Router, experts and attention get their own weights.
+name: olmoe-pt-it
+base_model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/OLMoE-1B-7B
+parents:
+  - {name: instruct, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/OLMoE-1B-7B-Instruct}
+  - {name: pretrained, model: C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/OLMoE-1B-7B}
+mode: full
+method: linear
+selection: weighted
+population: 3
+genes: 3
+seed: 5
+out_dtype: bfloat16
+gene_groups: [attention, mlp, router, other]
+evaluation:
+  device: xpu
+  batch_size: 4
+  num_fewshot: 0
+  apply_chat_template: false
+  limit: 50
+  penalty: 0.1
+  tasks:
+    arc_easy: {metric: 'acc_norm,none', weight: 1.0}
+    hellaswag: {metric: 'acc_norm,none', weight: 1.0}

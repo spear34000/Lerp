@@ -1,6 +1,8 @@
 # Toward a model-family-independent train / merge / search ecosystem
 
-Goal: any Hugging Face causal LM (dense, multimodal, mixture-of-experts, any size) can be trained with LoRA, merged, searched and evaluated by the same
+**This file separates the goal from what exists.** The *goal* is the paragraph below; the tables record only what is implemented and how it was verified.
+
+**Goal (not yet reached):** any Hugging Face causal LM (dense, multimodal, mixture-of-experts, any size) can be trained with LoRA, merged, searched and evaluated by the same
 pipeline, and supporting a *new* family means writing configuration, not code. This file records what is general today, what is verified, and what is still missing.
 
 ## Layers and how family-specific each one is
@@ -29,7 +31,10 @@ pipeline, and supporting a *new* family means writing configuration, not code. T
 - Fused expert parameters (Gemma 4 26B-A4B stores experts as one 3-D parameter, not `nn.Linear`) are merged but cannot receive LoRA through PEFT's module targeting.
 - Merged MoE checkpoints above ~14 GB cannot be loaded for evaluation on a 16 GB GPU / 31 GB RAM machine without quantization (a GGUF + llama.cpp backend is the missing piece).
 - Router interpolation has no quality guarantee; give it its own gene group and let the search decide.
-- `lerp search` scores log-likelihood multiple-choice tasks only; generative benchmarks (GSM8K, code) need an exact-match scorer with generation.
+- `lerp search` scores log-likelihood multiple-choice and greedy exact-match tasks; code-execution benchmarks (HumanEval, MBPP) are not supported.
 - Resident full-checkpoint blending maps checkpoint names onto the loaded model; per-expert -> fused experts and tied weights are handled, other renamings abort with a message and need a mapping.
 - Quantized sources (GPTQ/AWQ/GGUF) must be dequantized first; there is no direct support.
-- Training beyond LoRA (full fine-tuning, DPO, MoE expert adapters) is not wired in.
+- Training beyond LoRA (full fine-tuning, DPO, MoE expert adapters) is not wired in, and there is no `lerp train` command: training is `experiments/train_lora.py`.
+- Merge methods: linear and task arithmetic only. SLERP is not implemented; TIES / DARE exist only as MergeKit recipes that have not been run here.
+- Adapters other than plain LoRA (DoRA, AdaLoRA, rank/alpha patterns, bias, modules_to_save) are rejected; quantized inputs are not supported.
+- Out of scope: Dense <-> MoE conversion, dimension expansion, knowledge editing.

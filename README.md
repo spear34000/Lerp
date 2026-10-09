@@ -89,12 +89,32 @@ Small models on one 16 GB Intel Arc machine; sample sizes are 100-300 items per 
 | OLMoE-1B-7B (base, Instruct) | mixture-of-experts | full-checkpoint merge, generation, evaluation |
 | Gemma-4-26B-A4B, Qwen3-30B-A3B | MoE | LoRA targets and tensor groups probed from the config only; **not merged** |
 
+## What is supported, and what is not
+
+| Supported | Notes |
+|---|---|
+| Linear and task-arithmetic merging | full checkpoints (`lite` engine, or MergeKit) and LoRA adapters (exact rank concatenation) |
+| Layer-wise and module-group-wise weights | attention / mlp / router / norm / embedding / other, plus a depth profile; routers of MoE models are their own group |
+| Search | evolution, GP + expected improvement, random; `lerp search` scores in seconds with a resident model |
+| Evaluation | log-likelihood multiple-choice and greedy-decoded exact-match tasks as YAML blocks; any lm-eval task through `lerp cycle` |
+
+| Not supported (today) | What happens instead |
+|---|---|
+| SLERP | not implemented |
+| Own TIES / DARE | only emitted as MergeKit recipes (`method: ties`, `dare_ties`, `dare_linear`); **no MergeKit run has been exercised here** and the resident evaluator and `lite` engine refuse them |
+| Training from the CLI | no `lerp train`; LoRA training is the script `experiments/train_lora.py` |
+| DoRA, AdaLoRA, rsLoRA-patterns, bias / `modules_to_save`, `rank_pattern`, embedding LoRA | the adapter is rejected with an error (`check`, `build`) |
+| Quantized inputs (GPTQ, AWQ, GGUF, bitsandbytes bases / QLoRA bases) | dequantize first; the merge needs the full-precision base |
+| Changing architecture (layer removal, width change, Dense <-> MoE conversion) | not implemented; parents must share exactly the same architecture |
+| Knowledge editing (ROME, MEMIT) | out of scope |
+| Different families (Qwen3 + Gemma 4) | cannot be weight-merged; `check` refuses |
+
 ## Limits worth knowing
 
 - Ancestry cannot be proven from files: matching configs and shapes do not show that two checkpoints share a base revision.
 - Merged checkpoints larger than ~14 GB cannot be evaluated on a 16 GB GPU without quantization (no GGUF backend yet). Merging itself streams tensor by tensor.
-- `lerp search` scores log-likelihood multiple-choice tasks (`acc`, `acc_norm`) and greedy-decoded generative tasks (`exact_match`, e.g. GSM8K; code execution is not supported). It refuses models whose logits it cannot reproduce (checked on startup) and checkpoints whose tensor names it cannot map onto the loaded model.
-- No MergeKit (TIES/DARE) run has been exercised here; quantized sources (GPTQ/AWQ/GGUF) are not supported directly.
+- `lerp search` scores log-likelihood multiple-choice tasks (`acc`, `acc_norm`) and greedy-decoded generative tasks (`exact_match`, e.g. GSM8K); code execution (HumanEval, MBPP) is not supported. It refuses models whose logits it cannot reproduce (checked on startup) and checkpoints whose tensor names it cannot map onto the loaded model.
+- Measured gains are small and mostly within noise except for one complementary pair; see the table above and [`experiments/RESULTS.md`](experiments/RESULTS.md).
 - Read the [critical review](docs/CRITICAL_REVIEW_KO.md) and the [technical audit](docs/V04_TECHNICAL_AUDIT.md) before quoting any result.
 
 ## Repository
@@ -109,10 +129,9 @@ tests/         150+ tests (numerical merge checks, crash recovery, GP, model fam
 
 ## Roadmap
 
-1. Code-execution tasks (HumanEval, MBPP) in the resident evaluator.
-2. A GGUF / llama.cpp evaluation backend so large MoE merges can be scored locally.
-3. Expert-level adapters for fused-expert MoE models.
-4. Name mappings for further architectures whose checkpoints differ from the loaded module names.
+Planned, in order: paired statistics against the parents (McNemar), SLERP and in-house TIES / DARE for the `lite` engine and the resident evaluator, a measured skill-adapter demo (code / math / Korean LoRA at 4B),
+a profiled and faster candidate apply. Considered but not started: a `lerp train` command, a GGUF / llama.cpp evaluation backend, layer removal before merging.
+Out of scope: Dense <-> MoE conversion, dimension expansion, knowledge editing, custom GPU kernels.
 
 ## License
 

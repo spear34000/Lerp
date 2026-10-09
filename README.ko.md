@@ -56,12 +56,38 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 | 큰/특이한 체크포인트 | Gemma 4 E4B(멀티모달 16GB) 5분, OLMoE-1B-7B(전문가 64개/층) 55초에 병합, 그룹별 가중치가 정확히 적용됨 |
 | 다른 계열(Qwen3 + Gemma 4) | 가중치 병합 불가. `check`가 구조·어휘·토크나이저 불일치로 거부 |
 
+## 지원 범위
+
+| 지원 | 비고 |
+|---|---|
+| Linear, Task Arithmetic 병합 | 전체 체크포인트(`lite` 엔진 또는 MergeKit)와 LoRA(랭크 이어붙이기로 정확히 병합) |
+| 층별, 모듈 그룹별 가중치 | attention / mlp / router / norm / embedding / other + 깊이 프로파일. MoE 라우터는 별도 그룹 |
+| 탐색 | 진화, GP + 기대 개선, 무작위. `lerp search`는 상주 모델로 후보당 몇 초 |
+| 평가 | YAML 블록으로 쓰는 객관식 로그확률 과제와 greedy 생성형 exact match 과제, `lerp cycle`로 lm-eval의 모든 과제 |
+
+| 미지원 (현재) | 대신 일어나는 일 |
+|---|---|
+| SLERP | 미구현 |
+| 자체 TIES / DARE | MergeKit 레시피로만 생성(`ties`, `dare_ties`, `dare_linear`). **MergeKit 실행은 이 환경에서 검증하지 않았고** 상주 평가기와 `lite` 엔진은 거부합니다 |
+| 학습 CLI | `lerp train` 없음. LoRA 학습은 `experiments/train_lora.py` 스크립트 |
+| DoRA, AdaLoRA, `rank_pattern`, bias / `modules_to_save`, 임베딩 LoRA | 어댑터를 오류로 거부(`check`, `build`) |
+| 양자화 입력 (GPTQ, AWQ, GGUF, bitsandbytes 베이스 / QLoRA 베이스) | 먼저 dequantize 필요. 병합에는 완전 정밀도 베이스가 필요 |
+| 구조 개조 (층 제거, 폭 변경, Dense <-> MoE 변환) | 미구현. 부모는 구조가 완전히 같아야 함 |
+| 지식 편집 (ROME, MEMIT) | 범위 밖 |
+| 다른 계열 (Qwen3 + Gemma 4) | 가중치 병합 불가, `check`가 거부 |
+
 ## 한계
 
 - 파일만으로는 두 체크포인트가 같은 베이스에서 나왔는지 증명할 수 없습니다.
 - 약 14GB를 넘는 병합본은 양자화 없이는 16GB GPU에서 평가할 수 없습니다(GGUF 백엔드 미구현). 병합 자체는 텐서 단위 스트리밍이라 가능합니다.
-- `lerp search`는 객관식 로그 확률 과제(`acc`, `acc_norm`)와 greedy 디코딩 생성형 과제(`exact_match`, 예: GSM8K)를 채점합니다. 코드 실행(HumanEval, MBPP)은 아직 지원하지 않습니다.
+- `lerp search`는 객관식 로그 확률 과제(`acc`, `acc_norm`)와 greedy 디코딩 생성형 과제(`exact_match`, 예: GSM8K)를 채점합니다. 코드 실행(HumanEval, MBPP)은 지원하지 않습니다.
+- 측정된 이득은 보완적인 한 쌍을 빼면 작고 대부분 노이즈 범위입니다. [측정 결과](experiments/RESULTS.md)를 보세요.
 - 결과를 인용하기 전에 [비판적 검토](docs/CRITICAL_REVIEW_KO.md)와 [기술 감사](docs/V04_TECHNICAL_AUDIT.md)를 읽어 주세요. 한국어 설치 안내는 [QUICKSTART_KO.md](QUICKSTART_KO.md)에 있습니다.
+
+## 로드맵
+
+계획(순서대로): 부모 대비 쌍체 통계(McNemar), `lite` 엔진과 상주 평가기용 SLERP와 자체 TIES / DARE, 4B 코드·수학·한국어 LoRA 병합 실측, 후보 적용 속도 개선.
+검토만 한 것(시작 전): `lerp train` 명령, GGUF / llama.cpp 평가 백엔드, 병합 전 층 제거. 하지 않을 것: Dense <-> MoE 변환, 차원 확장, 지식 편집, 자체 GPU 커널.
 
 ## 라이선스
 

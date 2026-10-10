@@ -97,8 +97,9 @@ def train_adapter(base: str, pairs: Sequence[tuple[str, str]], out: Path, *, ini
             "init": None if init is None else str(init)}
 
 
-def compress_adapter(src: Path, dst: Path, rank: int) -> dict:
-    """Best rank-``rank`` approximation (truncated SVD) of every module delta ``(alpha/r) B A``, written as a standard adapter with scale 1.
+def compress_adapter(src: Path, dst: Path, rank: int, out_scale: float = 1.0) -> dict:
+    """Best rank-``rank`` approximation (truncated SVD) of every module delta ``(alpha/r) B A``, written as a standard adapter with scale ``out_scale``
+    (alpha = out_scale * r, B divided by out_scale, so the delta is unchanged; 2 matches freshly trained adapters).
 
     Works on the small factors only (QR of B and A^T, SVD of an r x r matrix), so it is exact for the retained directions and cheap."""
     import torch
@@ -126,7 +127,7 @@ def compress_adapter(src: Path, dst: Path, rank: int) -> dict:
             U, S, Vh = torch.linalg.svd(scale * Rb @ Ra.T)
             k = min(rank, S.numel())
             root = S[:k].sqrt()
-            out[b_key] = (Qb @ (U[:, :k] * root)).contiguous()
+            out[b_key] = (Qb @ (U[:, :k] * root) / out_scale).contiguous()
             out[key] = ((root[:, None] * Vh[:k]) @ Qa.T).contiguous()
             kept += float((S[:k] ** 2).sum())
             total += float((S ** 2).sum())
@@ -135,6 +136,6 @@ def compress_adapter(src: Path, dst: Path, rank: int) -> dict:
     dst.mkdir(parents=True, exist_ok=True)
     save_file(out, str(dst / "adapter_model.safetensors"), metadata={"format": "pt"})
     new = dict(cfg)
-    new.update({"r": min(rank, r), "lora_alpha": min(rank, r), "rank_pattern": {}, "alpha_pattern": {}})
+    new.update({"r": min(rank, r), "lora_alpha": out_scale * min(rank, r), "rank_pattern": {}, "alpha_pattern": {}})
     (dst / "adapter_config.json").write_text(json.dumps(new, indent=2), encoding="utf-8")
-    return {"rank_in": r, "rank_out": min(rank, r), "energy_kept": kept / total if total else 1.0}
+    return {"rank_in": r, "rank_out": min(rank, r), "energy_kept": kept / total if total else 1.0, "out_scale": out_scale}

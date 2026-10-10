@@ -11,8 +11,9 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from .experiment import (BreederError, advance, load_candidate, load_run, record_baseline, record_score)
+from .experiment import (BreederError, advance, candidate_dir, load_candidate, load_run, record_baseline, record_score)
 from .integrity import verify_frozen_inputs
+from .pairs import write_items
 
 PROTOCOL_FILE = "resident_protocol.json"
 _COMPARED = ("engine", "protocol_version", "mode", "items", "dtype", "device", "tasks", "softcap")
@@ -59,6 +60,7 @@ def search_run(run: Path, rounds: int = 1, *, device: str | None = None, dtype: 
                 metrics = session.evaluate_reference(name, window)
                 doc = record_baseline(run, name, metrics, source="lerp_eval", evidence=PROTOCOL_FILE,
                                       runtime_device=str(session.device), backend=backend)
+                write_items(run / "baselines" / name, session.last_items, window, PROTOCOL_FILE)
                 log(f"baseline {name}: {doc['fitness']:.4f} {metrics} ({time.time() - t0:.1f}s)")
         completed: list[int] = []
         for r in range(rounds):
@@ -78,6 +80,7 @@ def search_run(run: Path, rounds: int = 1, *, device: str | None = None, dtype: 
                     raise BreederError(str(exc)) from exc
                 doc = record_score(run, gen, idx, metrics, source="lerp_eval", evidence=PROTOCOL_FILE,
                                    runtime_device=str(session.device), backend=backend)
+                write_items(candidate_dir(run, gen, idx), session.last_items, window, PROTOCOL_FILE)
                 log(f"g{gen:03d}-c{idx:03d}  fitness {doc['fitness']:.4f}  {metrics}  ({time.time() - t0:.1f}s)")
             completed.append(gen)
             if r < rounds - 1:

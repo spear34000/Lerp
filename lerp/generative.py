@@ -56,8 +56,9 @@ class GenerativeScorer:
         return 0
 
     def accuracy(self, texts: dict[int, str]) -> dict[str, float]:
-        hits = {name: 0 for name in self.tasks}
+        outcomes: dict[str, dict[int, int]] = {name: {} for name in self.tasks}
         for i, text in texts.items():
-            name, _, _, gold = self.items[i]
-            hits[name] += int(self.tasks[name].extract_answer(text) == gold)
-        return {name: hits[name] / self.counts[name] for name in self.tasks}
+            name, doc, _, gold = self.items[i]
+            outcomes[name][doc] = int(self.tasks[name].extract_answer(text) == gold)
+        self.outcomes = {name: [outcomes[name][d] for d in sorted(outcomes[name])] for name in self.tasks}
+        return {name: sum(v) / self.counts[name] for name, v in self.outcomes.items()}

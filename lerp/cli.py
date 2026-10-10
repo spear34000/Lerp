@@ -136,6 +136,13 @@ def create_parser() -> argparse.ArgumentParser:
     board.add_argument("--pareto", action="store_true", help="Pareto fronts + crowding distance")
     board.add_argument("--top", type=int, default=20)
 
+    pairs = commands.add_parser("pairs", help="Item-by-item McNemar comparison of a candidate with its baselines (needs `lerp search` scores)")
+    pairs.add_argument("--run", "-r", type=Path, required=True)
+    pairs.add_argument("--generation", "-g", type=int, required=True)
+    pairs.add_argument("--candidate", "-i", type=int, required=True)
+    pairs.add_argument("--against", nargs="+", default=None, help="baseline names (default: base and every parent)")
+    pairs.add_argument("--out", "-o", type=Path, default=None, help="also write the rows as JSON")
+
     compare = commands.add_parser("compare", help="Compare children with independently evaluated unmerged parents")
     compare.add_argument("--run", "-r", type=Path, required=True)
     compare.add_argument("--top", type=int, default=20)
@@ -317,6 +324,14 @@ def _run(args: argparse.Namespace) -> int:
             if len(item["genes"]) > 9:
                 g += ",..."
             print(f"{i:<5} {item['id']:<12} {score['fitness']:>10.5f} {score['source']:<16} {score.get('status', '-'):<18} {g}")
+        return 0
+
+    if args.command == "pairs":
+        from .pairs import compare_pairs, format_rows
+        rows = compare_pairs(args.run, args.generation, args.candidate, args.against)
+        print(format_rows(rows))
+        if args.out:
+            args.out.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return 0
 
     if args.command == "compare":

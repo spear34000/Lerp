@@ -364,3 +364,27 @@ Candidate explanations for the remaining gap to the control, **all untested**:
 
 Compared with the first run (blend, unfixed): the gap to the control shrank from -0.050 (p = 0.024) to -0.018 (p = 0.22) and the evolved model is no longer significantly worse, but several things changed at once (scale, fitness, dev size, fewer and longer children), so this cannot be attributed to any single fix. One seed, one model size, one new skill:
 the result does not say evolution can never help, it says that here none of the variants shows a benefit over simply training one adapter for the same number of steps.
+
+## Evolution loop diagnostics: where the gap to plain training does *not* come from (`experiments/evolution_followup.py`)
+
+Cheap follow-ups on the crossover ablation above, reusing its founders, its control and their test scores (only the new organisms are trained and scored; same 1200 training steps, same 600 test items, seed 1, Qwen2.5-0.5B). Raw outputs:
+`experiments/results/evolution_followup/`.
+
+| variant | add | mul | chain | lineage steps / discarded | chain vs control-plain (0.115) |
+|---|---:|---:|---:|---:|---|
+| `none-seq`: no crossover, 1 child per generation, 6 generations of 200 steps | 0.928 | 0.340 | 0.092 | 600 / 600 | -0.023 [-0.049, +0.003] p = 0.098 |
+| `graft-r32`: graft, children stored at rank 32 | 0.900 | 0.312 | 0.083 | 200 / 1000 | -0.032 [-0.061, -0.003] p = 0.042 |
+| `blend-r32`: blend, children stored at rank 32 | 0.890 | 0.308 | 0.080 | 200 / 1000 | -0.035 [-0.063, -0.007] p = 0.019 |
+
+None of the variants differs from the earlier arms (all arm-versus-arm p > 0.3, resolution about +-0.03).
+
+What this rules out, for this configuration:
+
+* **Compression loss is not the cause.** At rank 32 the energy kept per child is 0.995-0.999 (it was 0.83-0.93 at rank 16) and the results did not move. `graft` still stalled: every child from generation 2 was rejected by the founder-anchored gate (their `add` fell to 0.79-0.85, `mul` to 0.22-0.26).
+  With truncation gone, the graft's loss of the old skills must have another cause (not found; the earlier "truncation residual" hypothesis for the graft is not supported).
+* **Waste from parallel children is not the whole story.** `none-seq` has no parallel children (one lineage of six 200-step segments) and still sits 0.023 below the control (p = 0.098, not significant at 600 items but pointing the same way as every other arm).
+* **Dev-set selection noise does not explain it.** The dev-selected organism of `none-seq` was g4-c0 (600 steps); scoring the last segment g6-c0 (1200 steps) on the test items gives the same `chain` accuracy (0.092 both), so choosing the latest segment instead would not have closed the gap.
+
+What remains consistent with the data, **untested**: each segment restarts the optimizer state and a 20-step warm-up and runs its own cosine decay to zero, while the control uses one schedule over 1200 steps. `chain` accuracy of the lineage did not improve between 600 and 1200 steps (0.092 -> 0.092)
+while the control reached 0.115; a restart-per-segment schedule is a candidate cause. A direct test is to carry the optimizer state and a single learning-rate schedule across a lineage (or to measure the control at 600 steps to see whether the plateau is real).
+One seed and 600 items cannot resolve differences below about 0.03, so even the direction of the small gaps is uncertain.

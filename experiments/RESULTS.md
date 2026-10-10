@@ -294,10 +294,10 @@ Setup: Qwen2.5-0.5B, 2 founders x 150 steps, 3 generations, <= 4 children per ge
 
 * New skill learned: evolved vs best founder on `chain` +0.053, 95% CI [+0.020, +0.086], p = 0.0025 (21 vs 5 items) - the gate is passed, narrowly. Old skills retained (-0.020 add, -0.007 mul).
 * **Evolution did not beat plain training: on `chain` the control is better, evolved - control = -0.050 [-0.090, -0.009], p = 0.024 (12 vs 27 items); on `mul` -0.037 [-0.068, -0.005], p = 0.035.** Verdict from the pre-set criteria: *learned and retained, but NOT shown to beat plain training*.
-* The absolute numbers are low: a 0.5B model learns `a + b * c` only to 13% with 1100 steps. The loop spreads the same compute over 11 children of 100 steps each, so every lineage gets little learning; selection on a 100-item dev split picks among near-equal candidates (dev chain 0.06-0.10) mostly by noise.
+* The absolute numbers are low: a 0.5B model learns `a + b * c` only to 13% with 1100 steps. The loop spreads the same compute over 11 children of 100 steps each, so every lineage gets little learning; selection on a 100-item dev split chose among near-equal candidates (dev chain 0.06-0.10); whether it picked by noise was not tested.
 
-Limits: one seed, one configuration, a model too small for the new skill, no tuning of the loop. This does not show that an evolutionary outer loop can never help (more steps per child, a skill the founders' recombination actually helps with, larger populations); it shows that
-at this scale it is not better than training one adapter for the same number of steps, and the loop is not "evolution that accumulates abilities" until that comparison is won.
+Limits: one seed, one configuration, low accuracy on the new skill (a floor effect of a 0.5B model is a hypothesis, not established), no tuning of the loop, and a comparison that was not condition-matched (see *Corrections* at the end). This does not show that an evolutionary outer loop can never help (more steps per child, a skill the founders' recombination actually helps with, larger populations); it shows that
+in this run it was not better than training one adapter for the same number of steps, and the loop is not "evolution that accumulates abilities" until that comparison is won.
 
 ## Does merging beat both parents? Pre-registered test (`experiments/merge_proof.py`): **not proven**
 
@@ -312,14 +312,14 @@ interval above 0? Criteria fixed before any run. Qwen2.5-0.5B, LoRA rank 16, 200
 
 Findings (searched blend; the 0.5 blend is within 0.005 of it everywhere):
 
-* **ARC + BoolQ: the blend beats both parents in all 3 seeds, significantly.** Against the ARC parent +0.054 to +0.062 (p < 0.0001). Against the better parent (BoolQ) +0.025 / +0.042 / +0.018 (p = 0.0014 / < 0.0001 / 0.021),
+* **ARC + BoolQ: the blend scores above both parents in all 3 seeds** (p < 0.05 by the conventional threshold; the pre-set bar was +0.03 with p < 0.01 in every seed). Against the ARC parent +0.054 to +0.062 (p < 0.0001). Against the better parent (BoolQ) +0.025 / +0.042 / +0.018 (p = 0.0014 / < 0.0001 / 0.021),
   every interval above 0. The pre-set bar (+0.03 over *both* parents with p < 0.01 in *every* seed) is met in 1 of 3 seeds, so the claim as pre-registered is **not proven**; the honest reading is a real but modest gain over the better parent, about +0.03.
-* **The blend is not better than one adapter trained on both skills.** Blend minus multi-task: -0.005 / +0.004 / -0.006 (p = 0.45-0.64). Merging reaches what joint training reaches without a joint training run, but does not exceed it.
+* **No difference to one adapter trained on both skills was detected.** Blend minus multi-task: -0.005 / +0.004 / -0.006 (p = 0.45-0.64). The blend scored similar to joint training; equivalence was not tested.
 * **The search added nothing over the fixed 0.5 blend.** Searched versus 0.5: pooled within 0.004 in every seed; 12 evaluations bought no measurable gain on this plateau.
 * **PIQA + HellaSwag: nothing to prove.** The LoRAs barely moved the base model (0.602 and 0.596 against base 0.596), so there are no skills to combine; the blend equals everything within +-0.01 (all p > 0.05). Training did not create a skill here,
   which is a failed premise, not evidence about merging.
 
-What this shows and does not show: for two clearly complementary skills, merging two small LoRAs recovers essentially all of the benefit of joint training and beats each parent by roughly +0.02 to +0.06 on fresh items, robustly across seeds. It does not show
+What this shows and does not show: for two clearly complementary skills, merging two small LoRAs scored similar to joint training and above each parent by roughly +0.02 to +0.06 on fresh items in all three seeds (pre-set bar met in one of three). It does not show
 "noticeably better than existing models" nor better than joint training; only one task pair at 0.5B shows a gain and the requested bar was not met.
 
 ## Evolution loop after the fixes: crossover ablation (`experiments/evolution_ablation.py`): **no arm beats plain training**
@@ -354,18 +354,21 @@ The `control-plain` and `merge-only` rows are bit-identical across the three arm
 Resolution: with one seed and 600 items the arm-versus-arm intervals are about +-0.027, so differences smaller than roughly 0.03 cannot be seen; "no measurable difference between crossover modes" means exactly that, not that they are equal.
 Graft against the control is borderline (CI excludes 0, p = 0.0505), not significant.
 
-Candidate explanations for the remaining gap to the control, **all untested**:
+Candidate explanations for the remaining gap to the control, **all untested** (items 5-7 were found in a later review and mean the comparison was not condition-matched; see *Corrections*):
 
 1. The structural waste above (two thirds of the steps never reach the final organism).
 2. Re-compression every generation (rank 32 -> 16 keeps only 83-99% of the energy; the control is compressed once, at the end).
 3. Every child restarts the optimizer and a 20-step warm-up inside its 200 steps; the control does this once.
 4. A flaw in the graft itself (a hypothesis): the stored `B` is the compressed version of the trained adapter but `init_B` is not, so `B - init_B` is not exactly "what B learned"; it also contains minus B's truncation residual, which lies mostly in the founders' subspace. Each graft would then strip some
    founder content, consistent with the `add`/`mul` drops that tripped the gate - but the summing of two skills' full deltas could equally explain it, and neither was checked.
+5. Different data mix: the sampler caps each family at its 2,000 training rows, so a 200-step child trains on 50% `chain` but the 1200-step control on 33.3%.
+6. Different LoRA rank during training: 32 for the control, 16 for `none` children, up to 64 (96 at `store_rank` 32) for `graft` children.
+7. Different starting points: the control starts from the 0.5/0.5 combination of the founders, a `none` generation-1 child from a single founder, a `graft` child from the sum of both founders' deltas.
 
 Compared with the first run (blend, unfixed): the gap to the control shrank from -0.050 (p = 0.024) to -0.018 (p = 0.22) and the evolved model is no longer significantly worse, but several things changed at once (scale, fitness, dev size, fewer and longer children), so this cannot be attributed to any single fix. One seed, one model size, one new skill:
 the result does not say evolution can never help, it says that here none of the variants shows a benefit over simply training one adapter for the same number of steps.
 
-## Evolution loop diagnostics: three explanations that were NOT detected (`experiments/evolution_followup.py`)
+## Evolution loop follow-up variants (not condition-matched) (`experiments/evolution_followup.py`)
 
 Cheap follow-ups on the crossover ablation above, reusing its founders, its control and their test scores (only the new organisms are trained and scored; same 1200 training steps, same 600 test items, seed 1, Qwen2.5-0.5B). Raw outputs:
 `experiments/results/evolution_followup/`.
@@ -378,14 +381,14 @@ Cheap follow-ups on the crossover ablation above, reusing its founders, its cont
 
 None of the variants differs from the earlier arms (all arm-versus-arm p > 0.3, resolution about +-0.03).
 
-What was and was not detected, for this configuration (**absence of a detected effect at +-0.03 resolution, not proof of absence**):
+Observations, for this configuration (**no effect detected at +-0.03 resolution is not proof of absence, and every comparison with the control carries the condition differences listed in *Corrections***):
 
-* **Compression loss: no effect detected.** At rank 32 the energy kept per child is 0.995-0.999 (it was 0.83-0.93 at rank 16) and the results did not move beyond noise. `graft` still stalled: every child from generation 2 was rejected by the founder-anchored gate (their `add` fell to 0.79-0.85, `mul` to 0.22-0.26).
+* **Storing children at rank 32: no change detected.** At rank 32 the energy kept per child is 0.995-0.999 (it was 0.83-0.93 at rank 16) and the results did not move beyond noise. `graft` still stalled: every child from generation 2 was rejected by the founder-anchored gate (their `add` fell to 0.79-0.85, `mul` to 0.22-0.26).
   With truncation gone, the graft's loss of the old skills has some other cause (not found; the earlier "truncation residual" hypothesis for the graft got no support).
-* **Waste from parallel children: not sufficient to explain it.** `none-seq` has no parallel children (one lineage of six 200-step segments) and still sits 0.023 below the control (p = 0.098, not significant at 600 items but pointing the same way as every other arm).
-* **Dev-set selection noise: no effect detected.** The dev-selected organism of `none-seq` was g4-c0 (600 steps); scoring the last segment g6-c0 (1200 steps) on the test items gives the same `chain` accuracy (0.092 both), so choosing the latest segment instead would not have closed the gap (for this one lineage).
+* **One lineage without parallel children (`none-seq`)** still scored 0.023 below the control (p = 0.098). It also differs from the control in data mix, training rank, starting point and schedule, so this does not isolate the effect of parallel children.
+* **Choosing the last segment instead of the dev-selected one: no change detected.** The dev-selected organism of `none-seq` was g4-c0 (600 steps); scoring the last segment g6-c0 (1200 steps) on the test items gives the same `chain` accuracy (0.092 both), so choosing the latest segment instead would not have closed the gap (for this one lineage).
 
-What remains consistent with the data, **untested**: each segment restarts the optimizer state and a 20-step warm-up and runs its own cosine decay to zero, while the control uses one schedule over 1200 steps. `chain` accuracy of the lineage did not improve between 600 and 1200 steps (0.092 -> 0.092)
+One candidate among several, **untested**: each segment restarts the optimizer state and a 20-step warm-up and runs its own cosine decay to zero, while the control uses one schedule over 1200 steps. `chain` accuracy of the lineage did not improve between 600 and 1200 steps (0.092 -> 0.092)
 while the control reached 0.115; a restart-per-segment schedule is a candidate cause. A direct test is to carry the optimizer state and a single learning-rate schedule across a lineage (or to measure the control at 600 steps to see whether the plateau is real).
 One seed and 600 items cannot resolve differences below about 0.03, so even the direction of the small gaps is uncertain.
 
@@ -404,7 +407,23 @@ Two more 1200-step controls with different training and sampling seeds and one 6
 | seed 3 (1200 steps) | 0.922 | 0.358 | 0.118 | +0.003 [-0.022, +0.028] p = 0.90 |
 | half (600 steps) | 0.907 | 0.322 | 0.090 | -0.025 [-0.049, -0.001] p = 0.058 |
 
-* The three full-length controls span 0.100-0.118 on `chain` (spread 0.018, mean 0.111). That is the size of most loop-versus-control gaps reported above, so those gaps (-0.018 to -0.035 against the single 0.115 control) are **mostly or entirely within the run-to-run noise of the procedure**. Against the mean of the controls, the evolved arms
-  (0.080-0.097) are 0.014-0.031 lower: possibly a small real deficit, not established.
-* The 600-step control (0.090) scores like the evolved arms. A reading consistent with this (not a test of it): the loops behave roughly like plain training with about half the steps.
-* By the pre-set rules this is the borderline case between "inside the noise" (spread about 0.02) and "real gap" (the half-step control is lower, but p = 0.058, not clearly). **Conclusion: on this benchmark plain training and the evolutionary loop cannot be separated with one seed and 600 items; the benchmark is too noisy and too close to the floor of a 0.5B model (about 10% accuracy) to rank loop designs.**
+* **Observed:** all six evolved results (0.080-0.097, the ablation arms and the follow-up variants) are below all three full-length controls (0.100-0.118, mean 0.111). That observation stands.
+* The 0.018 between the lowest and highest control is the range of three runs, not a confidence interval or an error bound, and the largest gap (0.035) exceeds it. The evolved side has one training seed per arm, so the **reproducibility and the size of the deficit are uncertain**, and so is its **cause**:
+  the comparisons were not condition-matched (data mix, training rank, starting point, optimizer and schedule restarts; see *Corrections*). Superiority of evolution is not shown; inferiority is observed but not established as reproducible; equivalence is not shown either.
+* The 600-step control (0.090) is not "half the training" of the 1200-step one: it trained on a different mix (45.5% `chain` against 33.3%), so it cannot be read as evidence that the loops behave like half-length training.
+* The earlier phrasing of this section ("mostly or entirely within the run-to-run noise", "too close to the floor of a 0.5B model") was not supported and has been withdrawn.
+
+## Corrections after an external review of the evolution experiments
+
+The evolution comparisons above were **not condition-matched**. Verified from the code (`run_evolution`'s sampler caps each family at its training rows) and the stored adapters:
+
+| condition | `chain` share of the training data | LoRA rank during training | starting point | learning-rate schedule |
+|---|---:|---:|---|---|
+| child, 200 steps (any arm) | 800 / 1,600 = 50.0% | `none` 16, `blend` 32, `graft` 32-64 (96 at store_rank 32) | survivor copy / 0.5 blend / graft sum | warm-up + cosine to zero every 200 steps, fresh optimizer |
+| control, 1200 steps | 2,000 / 6,000 = 33.3% | 32 | 0.5/0.5 combination of the founders | one warm-up + cosine over 1200 steps |
+| control, 600 steps | 2,000 / 4,400 = 45.5% | 32 | same | one schedule over 600 steps |
+
+Also corrected: the founders **are** complementary on the test items (`add`: 0.915 vs 0.783, McNemar p = 4.4e-12; `mul`: 0.342 vs 0.278, p = 1.1e-5); a claim made in conversation, based on 100 dev items of the first run, that they were not, was wrong. The forgetting gate did act (it rejected every `graft`
+child from generation 2); that the control forgot nothing means the gate's *benefit* was not demonstrated, not that it had nothing to do. The statement that an evolutionary loop "cannot win" against plain training on a single smoothly learnable skill is a hypothesis, not a result.
+
+What remains: **no evidence that the evolutionary loop beats plain training; an observed but unreplicated deficit; causes not separable with these runs.** The next step is a condition-matched design (fixed data mix, the same starting adapter and training rank, continuous versus segmented training from the same start) before any further loop change.

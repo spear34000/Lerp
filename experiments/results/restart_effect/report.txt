@@ -1,0 +1,22 @@
+C1 seed 1: loss 0.533
+C2 seed 1: 6 segments done
+C1 seed 2: loss 0.298
+C2 seed 2: 6 segments done
+C1 seed 3: loss 0.437
+C2 seed 3: 6 segments done
+
+model           add      mul    chain
+c1_s1         0.937    0.340    0.128
+c2_s1         0.902    0.287    0.085
+c1_s2         0.903    0.320    0.120
+c2_s2         0.893    0.282    0.095
+c1_s3         0.930    0.328    0.132
+c2_s3         0.883    0.293    0.100
+
+paired on chain (C2 - C1), same 600 test items: difference [95% CI] p (only C2 vs only C1)
+  seed 1: -0.043 [-0.073,-0.014] p=0.005 (28 vs 54)
+  seed 2: -0.025 [-0.051,+0.001] p=0.077 (24 vs 39)
+  seed 3: -0.032 [-0.062,-0.001] p=0.053 (34 vs 53)
+
+mean C2 - C1 = -0.033; signs ---
+practical threshold reached in the same direction in every seed: worth testing the restart explanation further (pilot, not a verdict)

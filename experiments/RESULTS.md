@@ -392,3 +392,19 @@ One seed and 600 items cannot resolve differences below about 0.03, so even the 
 **Caveat that applies to every gap in the three evolution sections (added after review).** All arm-versus-control comparisons since the crossover ablation reuse the *same single control adapter* scored on the *same test items*. They are therefore not independent confirmations:
 if that one control happened to land about 0.02 high, every arm would look worse at once, and the control of the first run (0.130, different settings and items) versus the ablation's (0.115) already differ by about the size of the gaps. Whether the gap to plain training exists at all
 requires replicating the control; see the next section.
+
+## How much does the plain-training control itself vary? (`experiments/control_replicates.py`)
+
+Two more 1200-step controls with different training and sampling seeds and one 600-step control (single schedule), same start (0.5/0.5 combination of the founders), same data, scored on the same 600 test items as everything above. Decision rules were written into the script before running.
+
+| control | add | mul | chain | chain vs original control |
+|---|---:|---:|---:|---|
+| original (1200 steps) | 0.930 | 0.355 | 0.115 | |
+| seed 2 (1200 steps) | 0.933 | 0.353 | 0.100 | -0.015 [-0.040, +0.010] p = 0.30 |
+| seed 3 (1200 steps) | 0.922 | 0.358 | 0.118 | +0.003 [-0.022, +0.028] p = 0.90 |
+| half (600 steps) | 0.907 | 0.322 | 0.090 | -0.025 [-0.049, -0.001] p = 0.058 |
+
+* The three full-length controls span 0.100-0.118 on `chain` (spread 0.018, mean 0.111). That is the size of most loop-versus-control gaps reported above, so those gaps (-0.018 to -0.035 against the single 0.115 control) are **mostly or entirely within the run-to-run noise of the procedure**. Against the mean of the controls, the evolved arms
+  (0.080-0.097) are 0.014-0.031 lower: possibly a small real deficit, not established.
+* The 600-step control (0.090) scores like the evolved arms. A reading consistent with this (not a test of it): the loops behave roughly like plain training with about half the steps.
+* By the pre-set rules this is the borderline case between "inside the noise" (spread about 0.02) and "real gap" (the half-step control is lower, but p = 0.058, not clearly). **Conclusion: on this benchmark plain training and the evolutionary loop cannot be separated with one seed and 600 items; the benchmark is too noisy and too close to the floor of a 0.5B model (about 10% accuracy) to rank loop designs.**

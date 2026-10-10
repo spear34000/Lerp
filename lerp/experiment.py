@@ -376,6 +376,8 @@ def build_candidate(run: Path, gen: int, idx: int, *, cuda: bool = False, retry_
         raise BreederError("Full checkpoint experiments cannot use --engine lora")
     if engine == "mergekit" and len(spec.gene_groups) > 1:
         raise BreederError("Module-group-specific genomes require --engine lite or --engine lora")
+    if engine == "mergekit" and method == "slerp":
+        raise BreederError("slerp is available in the lite engine (--engine lite) and in `lerp search`, not through MergeKit")
     if engine == "mergekit":
         _require_command("mergekit-yaml", 'pip install -e ".[merge]"')
     if engine in ("lite", "lora") and cuda:

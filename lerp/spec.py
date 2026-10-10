@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-SUPPORTED_METHODS = {"linear", "task_arithmetic", "ties", "dare_ties", "dare_linear"}
+SUPPORTED_METHODS = {"linear", "task_arithmetic", "slerp", "ties", "dare_ties", "dare_linear"}
 SUPPORTED_DTYPES = {"float16", "bfloat16", "float32"}
 SUPPORTED_SELECTION = {"weighted", "pareto"}
 SUPPORTED_MODES = {"full", "lora"}

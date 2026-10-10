@@ -35,6 +35,6 @@ pipeline, and supporting a *new* family means writing configuration, not code. T
 - Resident full-checkpoint blending maps checkpoint names onto the loaded model; per-expert -> fused experts and tied weights are handled, other renamings abort with a message and need a mapping.
 - Quantized sources (GPTQ/AWQ/GGUF) must be dequantized first; there is no direct support.
 - Training beyond LoRA (full fine-tuning, DPO, MoE expert adapters) is not wired in, and there is no `lerp train` command: training is `experiments/train_lora.py`.
-- Merge methods: linear and task arithmetic only. SLERP is not implemented; TIES / DARE exist only as MergeKit recipes that have not been run here.
+- Merge methods: linear and task arithmetic (full checkpoints and LoRA); SLERP, TIES, DARE-TIES and DARE-linear for full checkpoints in the lite engine and the resident evaluator only (not LoRA, not MergeKit, whose TIES / DARE recipes have not been run here). Their quality advantage over linear is not established.
 - Adapters other than plain LoRA (DoRA, AdaLoRA, rank/alpha patterns, bias, modules_to_save) are rejected; quantized inputs are not supported.
 - Out of scope: Dense <-> MoE conversion, dimension expansion, knowledge editing.

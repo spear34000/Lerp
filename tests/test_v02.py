@@ -358,10 +358,12 @@ def test_real_lite_3_parent_merge(tmp_path):
     assert torch.allclose(_read_merged_tensor(model, "model.layers.0.mlp.weight"), torch.full((2, 2), expected))
 
 
-def test_lite_rejects_ties(tmp_path):
+def test_lite_rejects_unknown_methods(tmp_path):
+    from lerp.lite import LiteMergeError, build_lite
     run = new_run(tmp_path)
-    with pytest.raises(exp.BreederError, match="Lite supports"):
-        exp.build_candidate(run, 0, 0, engine="lite")
+    spec, _ = exp.load_run(run)
+    with pytest.raises(LiteMergeError, match="Lite supports"):
+        build_lite(spec, exp.load_candidate(run, 0, 0)["genes"], tmp_path / "out", method="magic")
 
 
 def test_recover_completed_evaluation_score(tmp_path, monkeypatch):

@@ -1,0 +1,375 @@
+{
+  "pair": "piqahella",
+  "seed": 3,
+  "skills": [
+    "piqa",
+    "hellaswag"
+  ],
+  "tasks": [
+    "piqa",
+    "hellaswag"
+  ],
+  "fresh_window": [
+    500,
+    1500
+  ],
+  "best_genes": [
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5
+  ],
+  "best_search_fitness": 0.61,
+  "accuracy": {
+    "base": {
+      "piqa": 0.688,
+      "hellaswag": 0.504
+    },
+    "piqa": {
+      "piqa": 0.697,
+      "hellaswag": 0.509
+    },
+    "hellaswag": {
+      "piqa": 0.68,
+      "hellaswag": 0.52
+    },
+    "blend_0.5": {
+      "piqa": 0.694,
+      "hellaswag": 0.51
+    },
+    "blend_best": {
+      "piqa": 0.694,
+      "hellaswag": 0.51
+    },
+    "multitask": {
+      "piqa": 0.699,
+      "hellaswag": 0.527
+    }
+  },
+  "comparisons": {
+    "blend_0.5_vs_piqa": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.603,
+        "difference": -0.001,
+        "both_right": 1162,
+        "a_only": 42,
+        "b_only": 44,
+        "both_wrong": 752,
+        "p_exact_two_sided": 0.9142116370824501,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.010130428118245185,
+          "upper": 0.008132426120243185,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.697,
+        "difference": -0.003,
+        "both_right": 676,
+        "a_only": 18,
+        "b_only": 21,
+        "both_wrong": 285,
+        "p_exact_two_sided": 0.7492586247608415,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.015363781250140145,
+          "upper": 0.009375757298044334,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.509,
+        "difference": 0.001,
+        "both_right": 486,
+        "a_only": 24,
+        "b_only": 23,
+        "both_wrong": 467,
+        "p_exact_two_sided": 1.0,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.012553780082131033,
+          "upper": 0.01454978806616297,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    },
+    "blend_0.5_vs_hellaswag": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.6,
+        "difference": 0.002,
+        "both_right": 1148,
+        "a_only": 56,
+        "b_only": 52,
+        "both_wrong": 744,
+        "p_exact_two_sided": 0.7729885295985343,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.008222714565152478,
+          "upper": 0.012218718561156474,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.68,
+        "difference": 0.014,
+        "both_right": 658,
+        "a_only": 36,
+        "b_only": 22,
+        "both_wrong": 284,
+        "p_exact_two_sided": 0.08694889972991099,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.001027736519475875,
+          "upper": 0.028971848295922982,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.52,
+        "difference": -0.01,
+        "both_right": 490,
+        "a_only": 20,
+        "b_only": 30,
+        "both_wrong": 460,
+        "p_exact_two_sided": 0.20263875106454066,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.023935369969266852,
+          "upper": 0.003975290128947489,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    },
+    "blend_0.5_vs_multitask": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.613,
+        "difference": -0.011,
+        "both_right": 1154,
+        "a_only": 50,
+        "b_only": 72,
+        "both_wrong": 724,
+        "p_exact_two_sided": 0.05682268892317514,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.021836003682635035,
+          "upper": -0.00014201829538694477,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.699,
+        "difference": -0.005,
+        "both_right": 669,
+        "a_only": 25,
+        "b_only": 30,
+        "both_wrong": 276,
+        "p_exact_two_sided": 0.5900533317766357,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.019624510700373056,
+          "upper": 0.009644470780213374,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.527,
+        "difference": -0.017,
+        "both_right": 485,
+        "a_only": 25,
+        "b_only": 42,
+        "both_wrong": 448,
+        "p_exact_two_sided": 0.049800114294728665,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.033061840670657844,
+          "upper": -0.0008702950578850718,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    },
+    "blend_best_vs_piqa": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.603,
+        "difference": -0.001,
+        "both_right": 1162,
+        "a_only": 42,
+        "b_only": 44,
+        "both_wrong": 752,
+        "p_exact_two_sided": 0.9142116370824501,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.010130428118245185,
+          "upper": 0.008132426120243185,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.697,
+        "difference": -0.003,
+        "both_right": 676,
+        "a_only": 18,
+        "b_only": 21,
+        "both_wrong": 285,
+        "p_exact_two_sided": 0.7492586247608415,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.015363781250140145,
+          "upper": 0.009375757298044334,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.509,
+        "difference": 0.001,
+        "both_right": 486,
+        "a_only": 24,
+        "b_only": 23,
+        "both_wrong": 467,
+        "p_exact_two_sided": 1.0,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.012553780082131033,
+          "upper": 0.01454978806616297,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    },
+    "blend_best_vs_hellaswag": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.6,
+        "difference": 0.002,
+        "both_right": 1148,
+        "a_only": 56,
+        "b_only": 52,
+        "both_wrong": 744,
+        "p_exact_two_sided": 0.7729885295985343,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.008222714565152478,
+          "upper": 0.012218718561156474,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.68,
+        "difference": 0.014,
+        "both_right": 658,
+        "a_only": 36,
+        "b_only": 22,
+        "both_wrong": 284,
+        "p_exact_two_sided": 0.08694889972991099,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.001027736519475875,
+          "upper": 0.028971848295922982,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.52,
+        "difference": -0.01,
+        "both_right": 490,
+        "a_only": 20,
+        "b_only": 30,
+        "both_wrong": 460,
+        "p_exact_two_sided": 0.20263875106454066,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.023935369969266852,
+          "upper": 0.003975290128947489,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    },
+    "blend_best_vs_multitask": {
+      "pooled": {
+        "items": 2000,
+        "a_accuracy": 0.602,
+        "b_accuracy": 0.613,
+        "difference": -0.011,
+        "both_right": 1154,
+        "a_only": 50,
+        "b_only": 72,
+        "both_wrong": 724,
+        "p_exact_two_sided": 0.05682268892317514,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.021836003682635035,
+          "upper": -0.00014201829538694477,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "piqa": {
+        "items": 1000,
+        "a_accuracy": 0.694,
+        "b_accuracy": 0.699,
+        "difference": -0.005,
+        "both_right": 669,
+        "a_only": 25,
+        "b_only": 30,
+        "both_wrong": 276,
+        "p_exact_two_sided": 0.5900533317766357,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.019624510700373056,
+          "upper": 0.009644470780213374,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      },
+      "hellaswag": {
+        "items": 1000,
+        "a_accuracy": 0.51,
+        "b_accuracy": 0.527,
+        "difference": -0.017,
+        "both_right": 485,
+        "a_only": 25,
+        "b_only": 42,
+        "both_wrong": 448,
+        "p_exact_two_sided": 0.049800114294728665,
+        "ci": {
+          "confidence": 0.95,
+          "lower": -0.033061840670657844,
+          "upper": -0.0008702950578850718,
+          "method": "Wald with +0.5 per cell (Agresti-Min)"
+        }
+      }
+    }
+  },
+  "search_evaluations": 12
+}

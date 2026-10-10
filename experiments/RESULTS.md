@@ -298,3 +298,26 @@ Setup: Qwen2.5-0.5B, 2 founders x 150 steps, 3 generations, <= 4 children per ge
 
 Limits: one seed, one configuration, a model too small for the new skill, no tuning of the loop. This does not show that an evolutionary outer loop can never help (more steps per child, a skill the founders' recombination actually helps with, larger populations); it shows that
 at this scale it is not better than training one adapter for the same number of steps, and the loop is not "evolution that accumulates abilities" until that comparison is won.
+
+## Does merging beat both parents? Pre-registered test (`experiments/merge_proof.py`): **not proven**
+
+Question asked: in every one of 3 training seeds, does a blend of two skill LoRAs beat BOTH parents on the pooled accuracy of the two tasks by >= +0.03, on 1000 fresh items per task (never used in the search), with exact McNemar p < 0.01 and a 95%
+interval above 0? Criteria fixed before any run. Qwen2.5-0.5B, LoRA rank 16, 200 SFT steps per skill (400 for the multi-task LoRA, the strongest control: one adapter trained on both skills), search = 12 GP evaluations on
+200 items (window 0-200), final scoring on items 500-1500. Per-seed raw results and the verdict output: `experiments/results/merge_proof/`.
+
+| pair | pooled accuracy, mean of 3 seeds: base / parent A / parent B / 0.5 blend / searched blend / multi-task LoRA |
+|---|---|
+| ARC-Easy + BoolQ | 0.602 / 0.675 / 0.706 / 0.732 / 0.734 / 0.737 |
+| PIQA + HellaSwag | 0.596 / 0.602 / 0.596 / 0.601 / 0.600 / 0.607 |
+
+Findings (searched blend; the 0.5 blend is within 0.005 of it everywhere):
+
+* **ARC + BoolQ: the blend beats both parents in all 3 seeds, significantly.** Against the ARC parent +0.054 to +0.062 (p < 0.0001). Against the better parent (BoolQ) +0.025 / +0.042 / +0.018 (p = 0.0014 / < 0.0001 / 0.021),
+  every interval above 0. The pre-set bar (+0.03 over *both* parents with p < 0.01 in *every* seed) is met in 1 of 3 seeds, so the claim as pre-registered is **not proven**; the honest reading is a real but modest gain over the better parent, about +0.03.
+* **The blend is not better than one adapter trained on both skills.** Blend minus multi-task: -0.005 / +0.004 / -0.006 (p = 0.45-0.64). Merging reaches what joint training reaches without a joint training run, but does not exceed it.
+* **The search added nothing over the fixed 0.5 blend.** Searched versus 0.5: pooled within 0.004 in every seed; 12 evaluations bought no measurable gain on this plateau.
+* **PIQA + HellaSwag: nothing to prove.** The LoRAs barely moved the base model (0.602 and 0.596 against base 0.596), so there are no skills to combine; the blend equals everything within +-0.01 (all p > 0.05). Training did not create a skill here,
+  which is a failed premise, not evidence about merging.
+
+What this shows and does not show: for two clearly complementary skills, merging two small LoRAs recovers essentially all of the benefit of joint training and beats each parent by roughly +0.02 to +0.06 on fresh items, robustly across seeds. It does not show
+"noticeably better than existing models" nor better than joint training; only one task pair at 0.5B shows a gain and the requested bar was not met.

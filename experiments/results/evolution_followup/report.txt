@@ -1,0 +1,28 @@
+model                             add      mul    chain   lineage steps / discarded
+control-plain                   0.930    0.355    0.115
+g0-mul                          0.783    0.342    0.020
+earlier blend                   0.890    0.318    0.097             400 /  800
+earlier graft                   0.892    0.325    0.085             200 / 1000
+earlier none                    0.892    0.345    0.093             400 /  800
+blend-r32 (g1-c0)               0.890    0.308    0.080             200 / 1000   verdict: learned and retained, but NOT shown to beat plain training
+graft-r32 (g1-c0)               0.900    0.312    0.083             200 / 1000   verdict: learned and retained, but NOT shown to beat plain training
+none-seq (g4-c0)                0.928    0.340    0.092             600 /  600   verdict: learned and retained, but NOT shown to beat plain training
+
+new skill (chain) paired McNemar, same test items: difference [95% CI] p (only-a vs only-b)
+  blend-r32    - control-plain  -0.035 [-0.063,-0.007] p=0.0186 (26 vs 47)
+  blend-r32    - earlier blend      -0.017 [-0.046,+0.012] p=0.3082
+  blend-r32    - earlier graft      -0.005 [-0.028,+0.018] p=0.7798
+  blend-r32    - earlier none       -0.013 [-0.040,+0.013] p=0.3817
+  graft-r32    - control-plain  -0.032 [-0.061,-0.003] p=0.0422 (30 vs 49)
+  graft-r32    - earlier blend      -0.013 [-0.041,+0.014] p=0.4030
+  graft-r32    - earlier graft      -0.002 [-0.017,+0.014] p=1.0000
+  graft-r32    - earlier none       -0.010 [-0.037,+0.017] p=0.5504
+  none-seq     - control-plain  -0.023 [-0.049,+0.003] p=0.0980 (24 vs 38)
+  none-seq     - earlier blend      -0.005 [-0.031,+0.021] p=0.8043
+  none-seq     - earlier graft      +0.007 [-0.019,+0.032] p=0.7035
+  none-seq     - earlier none       -0.002 [-0.027,+0.024] p=1.0000
+
+old skills: evolved minus best founder
+  blend-r32   add -0.025  mul -0.033
+  graft-r32   add -0.015  mul -0.030
+  none-seq    add +0.013  mul -0.002

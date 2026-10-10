@@ -227,3 +227,22 @@ def test_ablation_arms_can_share_founders_and_the_control(tmp_path):
         run_evolution(_cfg(base, founder_steps=4, founders_from=str(tmp_path / "a")), tmp_path / "c", log=lambda m: None)
     with pytest.raises(ValueError, match="cannot reuse"):
         run_evolution(_cfg(base, child_steps=4, control_from=str(tmp_path / "a")), tmp_path / "d", log=lambda m: None)
+
+
+def test_one_child_per_generation_a_higher_store_rank_and_reuse_with_the_same_total_steps(tmp_path):
+    from lerp.evolution.archive import Archive
+    base = _base(tmp_path)
+    first = run_evolution(_cfg(base, crossover="graft"), tmp_path / "a", log=lambda m: None)   # 2 generations x 2 children x 3 steps = 12
+    second = run_evolution(_cfg(base, crossover="graft", children=1, generations=4, store_rank=8, founders_from=str(tmp_path / "a"),
+                                control_from=str(tmp_path / "a")), tmp_path / "b", log=lambda m: None)  # 4 x 1 x 3 = 12: same compute
+    arc = Archive(tmp_path / "b" / "archive")
+    children = [o for o in arc.organisms.values() if o.op == "cross+learn"]
+    assert len(children) == 4 and all(len(o.parents) == 2 for o in children)   # one child per generation, scored on its own
+    assert all(json.loads((arc.root / o.adapter / "adapter_config.json").read_text())["r"] == 8 for o in children)   # store_rank honoured
+    # shared contenders are the source run's numbers, not recomputed ones
+    for name in ("base", "merge-only", "control-plain", "g0-add", "g0-mul"):
+        assert second["test_accuracy"][name] == first["test_accuracy"][name]
+    items_a = json.loads((tmp_path / "a" / "test_items.json").read_text())["items"]
+    items_b = json.loads((tmp_path / "b" / "test_items.json").read_text())["items"]
+    assert items_a["control-plain"] == items_b["control-plain"] and f"evolved:{second['best']}" in items_b
+    assert second["training_steps"] == {"evolution": 12, "control": 12}

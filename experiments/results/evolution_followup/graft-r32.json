@@ -1,0 +1,266 @@
+{
+  "config": {
+    "base_model": "C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen2.5-0.5B",
+    "device": "xpu",
+    "dtype": "bfloat16",
+    "founders": [
+      "add",
+      "mul"
+    ],
+    "new_family": "chain",
+    "n_train": 2000,
+    "n_dev": 300,
+    "n_test": 600,
+    "founder_steps": 150,
+    "child_steps": 200,
+    "generations": 3,
+    "children": 2,
+    "survivors": 2,
+    "crossover": "graft",
+    "cross_weights": [
+      0.3,
+      0.5,
+      0.7
+    ],
+    "replay_fraction": 0.5,
+    "new_skill_weight": 2.0,
+    "adapter_scale": 2.0,
+    "rank": 16,
+    "store_rank": 32,
+    "lr": 0.0002,
+    "batch": 4,
+    "accum": 2,
+    "max_new_tokens": 12,
+    "seed": 1,
+    "founders_from": "C:\\Users\\spear\\AppData\\Local\\Temp\\evo2\\out\\s1\\graft",
+    "control_from": "C:\\Users\\spear\\AppData\\Local\\Temp\\evo2\\out\\s1\\graft"
+  },
+  "criteria": {
+    "new_skill_gain": 0.05,
+    "new_skill_p": 0.01,
+    "retention_tolerance": 0.05,
+    "beats_control_p": 0.05
+  },
+  "data_sha256": {
+    "add_train": "a691a229fc14972e383a9e9ede49f53425bc42b93132402153053666214b5d0c",
+    "add_eval": "167e263f7c3b3caadf64870f81aa9e6eae62c44f4d980c4f5544e3f588c75dcc",
+    "mul_train": "c0950641210325dce5a35a28361ebf8ed4a54654a15176e32a1d8996bf572842",
+    "mul_eval": "ddc80517d27f602a7a073441a7984da779e543ddd9f4c9d40b5f49ce3c5e3c68",
+    "chain_train": "114442e678cabea7ea7b4f8ff870127e906db4d8f94af9b8dff93c4a989ecfcc",
+    "chain_eval": "30bb4ccff96371c588b7dddbc0241d9c03384832d6c60c8b58c5daf0ebb0b60a"
+  },
+  "best": "g1-c0",
+  "lineage": [
+    "g0-add",
+    "g0-mul",
+    "g1-c0"
+  ],
+  "anchor_dev": {
+    "add": 0.91,
+    "mul": 0.33
+  },
+  "test_accuracy": {
+    "evolved:g1-c0": {
+      "add": 0.9,
+      "mul": 0.31166666666666665,
+      "chain": 0.08333333333333333
+    },
+    "base": {
+      "add": 0.585,
+      "mul": 0.23333333333333334,
+      "chain": 0.005
+    },
+    "merge-only": {
+      "add": 0.9266666666666666,
+      "mul": 0.32666666666666666,
+      "chain": 0.011666666666666667
+    },
+    "control-plain": {
+      "add": 0.93,
+      "mul": 0.355,
+      "chain": 0.115
+    },
+    "g0-add": {
+      "add": 0.915,
+      "mul": 0.2783333333333333,
+      "chain": 0.008333333333333333
+    },
+    "g0-mul": {
+      "add": 0.7833333333333333,
+      "mul": 0.3416666666666667,
+      "chain": 0.02
+    }
+  },
+  "retention_vs_best_founder": {
+    "add": -0.015000000000000013,
+    "mul": -0.030000000000000027
+  },
+  "comparisons": {
+    "add: evolved vs best founder (g0-add)": {
+      "items": 600,
+      "a_accuracy": 0.9,
+      "b_accuracy": 0.915,
+      "difference": -0.015,
+      "both_right": 512,
+      "a_only": 28,
+      "b_only": 37,
+      "both_wrong": 23,
+      "p_exact_two_sided": 0.3210841356849956,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.04137306278819243,
+        "upper": 0.01147273056227881,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "add: evolved vs control-plain": {
+      "items": 600,
+      "a_accuracy": 0.9,
+      "b_accuracy": 0.93,
+      "difference": -0.03,
+      "both_right": 514,
+      "a_only": 26,
+      "b_only": 44,
+      "both_wrong": 16,
+      "p_exact_two_sided": 0.04139142867391546,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.05722962845018368,
+        "upper": -0.002571036001643566,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "add: evolved vs merge-only": {
+      "items": 600,
+      "a_accuracy": 0.9,
+      "b_accuracy": 0.9266666666666666,
+      "difference": -0.02666666666666667,
+      "both_right": 524,
+      "a_only": 16,
+      "b_only": 32,
+      "both_wrong": 28,
+      "p_exact_two_sided": 0.0293049467205293,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.0492692431423059,
+        "upper": -0.003886903037096094,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "mul: evolved vs best founder (g0-mul)": {
+      "items": 600,
+      "a_accuracy": 0.31166666666666665,
+      "b_accuracy": 0.3416666666666667,
+      "difference": -0.03,
+      "both_right": 165,
+      "a_only": 22,
+      "b_only": 40,
+      "both_wrong": 373,
+      "p_exact_two_sided": 0.030015864349067292,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.055631460312778276,
+        "upper": -0.0041692041390489695,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "mul: evolved vs control-plain": {
+      "items": 600,
+      "a_accuracy": 0.31166666666666665,
+      "b_accuracy": 0.355,
+      "difference": -0.043333333333333335,
+      "both_right": 165,
+      "a_only": 22,
+      "b_only": 48,
+      "both_wrong": 365,
+      "p_exact_two_sided": 0.002547564898253958,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.07040503454460127,
+        "upper": -0.01597370299692696,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "mul: evolved vs merge-only": {
+      "items": 600,
+      "a_accuracy": 0.31166666666666665,
+      "b_accuracy": 0.32666666666666666,
+      "difference": -0.015,
+      "both_right": 158,
+      "a_only": 29,
+      "b_only": 38,
+      "both_wrong": 375,
+      "p_exact_two_sided": 0.3284320626971899,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.04177122758678731,
+        "upper": 0.011870895360873681,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "chain: evolved vs best founder (g0-mul)": {
+      "items": 600,
+      "a_accuracy": 0.08333333333333333,
+      "b_accuracy": 0.02,
+      "difference": 0.06333333333333334,
+      "both_right": 7,
+      "a_only": 43,
+      "b_only": 5,
+      "both_wrong": 545,
+      "p_exact_two_sided": 1.3680484300948592e-08,
+      "ci": {
+        "confidence": 0.95,
+        "lower": 0.04089746399034194,
+        "upper": 0.08534838318573779,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "chain: evolved vs control-plain": {
+      "items": 600,
+      "a_accuracy": 0.08333333333333333,
+      "b_accuracy": 0.115,
+      "difference": -0.03166666666666667,
+      "both_right": 20,
+      "a_only": 30,
+      "b_only": 49,
+      "both_wrong": 501,
+      "p_exact_two_sided": 0.042165443994951105,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.060572465836001836,
+        "upper": -0.002550457752038028,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "chain: evolved vs merge-only": {
+      "items": 600,
+      "a_accuracy": 0.08333333333333333,
+      "b_accuracy": 0.011666666666666667,
+      "difference": 0.07166666666666667,
+      "both_right": 3,
+      "a_only": 47,
+      "b_only": 4,
+      "both_wrong": 546,
+      "p_exact_two_sided": 2.4163071543625847e-10,
+      "ci": {
+        "confidence": 0.95,
+        "lower": 0.04865490958699959,
+        "upper": 0.09420223327014327,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    }
+  },
+  "checks": {
+    "new_skill_learned": true,
+    "old_skills_retained": true,
+    "evolution_beats_plain_training": false
+  },
+  "verdict": "learned and retained, but NOT shown to beat plain training",
+  "training_steps": {
+    "evolution": 1200,
+    "control": 1200
+  },
+  "steps_in_final_lineage": 200,
+  "steps_discarded": 1000,
+  "wall_seconds": 995.9973351955414
+}

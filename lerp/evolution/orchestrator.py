@@ -38,7 +38,7 @@ CRITERIA = {
 CROSSOVERS = ("blend", "graft", "none")
 _SAME_FOR_REUSE = ("seed", "n_train", "n_dev", "n_test", "founders", "new_family", "founder_steps", "rank", "lr", "batch", "accum",
                    "adapter_scale", "dtype", "max_new_tokens")
-_SAME_FOR_CONTROL = _SAME_FOR_REUSE + ("child_steps", "generations", "children", "replay_fraction")
+_SAME_FOR_CONTROL = _SAME_FOR_REUSE + ("replay_fraction",)   # plus the total number of training steps, checked separately
 
 
 @dataclass
@@ -62,6 +62,7 @@ class EvolutionConfig:
     new_skill_weight: float = 2.0     # fitness = weighted mean of the dev accuracies; the new skill counts this many times
     adapter_scale: float = 2.0        # alpha / r of every stored adapter; 2 = fresh adapters (1 reproduces the first run)
     rank: int = 16
+    store_rank: int | None = None     # rank of the stored children (None = rank); a higher value loses less when a child is compressed
     lr: float = 2e-4
     batch: int = 4
     accum: int = 2
@@ -112,6 +113,7 @@ class Evaluator:
 
     def __init__(self, cfg: EvolutionConfig, data: Path, families: list[str]):
         self.cfg, self.families = cfg, families
+        self.spare: list[Path] = []   # other adapters: the loader wants two distinct parents even to score one
         self.files = {f: (data / f"{f}_eval.jsonl").resolve() for f in families}
 
     def _spec(self, pair: list[tuple[str, Path]]):
@@ -144,6 +146,10 @@ class Evaluator:
         pool = [(a, adapters[n]) for a, n in alias.items()]
         if not pool:
             raise ValueError("at least one adapter is needed to build an evaluation session")
+        if len(pool) == 1:
+            other = next((p for p in self.spare if Path(p).resolve() != Path(pool[0][1]).resolve()), None)
+            if other is not None:
+                pool.append(("padslot", other))   # loaded together with the real one, never reported
         for i in range(0, len(pool), 2):
             pair = pool[i:i + 2]
             if len(pair) == 1:  # the loader wants two distinct parents; the padding adapter is never scored here
@@ -246,6 +252,7 @@ def run_evolution(cfg: EvolutionConfig, out: Path, *, log: Callable[[str], None]
                                  batch=cfg.batch, accum=cfg.accum)
         founders.append(register(Organism(id=oid, generation=0, op="founder", adapter=f"adapters/{oid}", training=info, status="survivor")))
         log(f"founder {oid}: {'reused' if reuse else 'trained'} {cfg.founder_steps} steps, loss {info.get('final_loss', float('nan')):.3f}")
+    evaluator.spare = [adapter_dir(f.id) for f in founders]
     evaluate_dev(founders)
     for o in founders:
         log(f"  {o.id} dev {o.dev}")
@@ -285,7 +292,7 @@ def run_evolution(cfg: EvolutionConfig, out: Path, *, log: Callable[[str], None]
             info = train_adapter(cfg.base_model, sft(learn_mix(), cfg.child_steps * pairs_per_step, cfg.seed * 1000 + g * 10 + k), trained,
                                  init=start, steps=cfg.child_steps, lr=cfg.lr, seed=cfg.seed + g * 10 + k, device=cfg.device, dtype=cfg.dtype,
                                  batch=cfg.batch, accum=cfg.accum)
-            info["compression"] = compress_adapter(trained, adapter_dir(oid), cfg.rank, cfg.adapter_scale)
+            info["compression"] = compress_adapter(trained, adapter_dir(oid), cfg.store_rank or cfg.rank, cfg.adapter_scale)
             info["start_adapter"] = f"adapters/{oid}-init"
             shutil.rmtree(trained, ignore_errors=True)
             steps_spent["evolution"] += cfg.child_steps
@@ -347,7 +354,22 @@ def run_evolution(cfg: EvolutionConfig, out: Path, *, log: Callable[[str], None]
     contenders: dict[str, Path | None] = {"base": None, "merge-only": merge_only, "control-plain": control, f"evolved:{best.id}": adapter_dir(best.id)}
     for o in founders:
         contenders[o.id] = adapter_dir(o.id)
-    acc, items = evaluator.score(contenders, test_window)
+    shared_source = None
+    if cfg.control_from and cfg.founders_from and Path(cfg.control_from).resolve() == Path(cfg.founders_from).resolve():
+        # the founders, base, merge-only and control are the same adapters as in the source run, scored on the same test items: reuse those
+        # scores instead of recomputing them (identical by construction; the evaluation is deterministic for a given batch composition)
+        shared_source = Path(cfg.control_from)
+        src_items = json.loads((shared_source / "test_items.json").read_text(encoding="utf-8"))
+        if [list(w) for w in (src_items["test_window"],)] != [list(test_window)]:
+            raise ValueError("cannot reuse test scores: different test window")
+        src_acc = json.loads((shared_source / "result.json").read_text(encoding="utf-8"))["test_accuracy"]
+        shared_names = [n for n in contenders if n in src_acc and not n.startswith("evolved:")]
+        fresh = {n: p for n, p in contenders.items() if n not in shared_names}
+        acc, items = evaluator.score(fresh, test_window)
+        for n in shared_names:
+            acc[n], items[n] = src_acc[n], src_items["items"][n]
+    else:
+        acc, items = evaluator.score(contenders, test_window)
     from ..statistics import mcnemar
     evolved = f"evolved:{best.id}"
     founder_ids = [o.id for o in founders]

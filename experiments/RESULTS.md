@@ -448,3 +448,40 @@ real-training check (`tests/test_restart.py`), and each missing ingredient break
 * The continuous runs (chain 0.120-0.132) score higher than the earlier controls (0.100-0.118); the difference we know of is the training mix (exactly 50% `chain` here against 33.3% for the earlier 1,200-step control), consistent with the data-mix confound found in review. Not isolated.
 
 Next step suggested by this result, not yet done: separate the components of the restart (carry only the optimizer state; use one global schedule with fresh optimizers), then rerun the evolution comparison with matched data mix, rank and starting point.
+
+## Restart cost split into optimizer state and learning-rate schedule (`experiments/restart_factorial.py`, 2x2, fresh test items)
+
+Cells (same start adapter, same 9,600-pair exact-mix stream in the same order, rank 32, 1,200 steps in six 200-step segments, same evaluation): C1 = state kept + one global schedule (continuous run); A = state kept + schedule restarted every segment; B = fresh optimizer every segment + one global schedule
+positioned by segment; C2 = fresh optimizer + restarted schedule. C1 and C2 are the models of the pilot above (not retrained); A and B were trained with the same three stream seeds. All 12 models were scored on **new** 1,000 items per family, none of them in any earlier training, dev or test split (hashes in
+`experiments/results/restart_factorial/result.json`). The decision rules were written into the script before the run (restart cost replicates if the seed mean is <= -0.02 in the C2-minus-C1 direction and every seed agrees; an effect is present if its seed mean is >= +0.02, every seed is positive and the
+95% item-bootstrap interval excludes 0; absent if within +-0.01 with an interval containing 0; otherwise no verdict). The bootstrap resamples items only; training-seed variation is covered by requiring the sign in every seed.
+
+| model | add (s1 / s2 / s3) | mul | chain |
+|---|---|---|---|
+| C1 continuous | 0.920 / 0.915 / 0.922 | 0.329 / 0.320 / 0.317 | 0.119 / 0.129 / 0.122 |
+| A state kept, schedule restarted | 0.885 / 0.889 / 0.865 | 0.275 / 0.285 / 0.289 | 0.080 / 0.083 / 0.098 |
+| B fresh optimizer, global schedule | 0.915 / 0.915 / 0.924 | 0.320 / 0.301 / 0.330 | 0.115 / 0.104 / 0.120 |
+| C2 fresh optimizer, schedule restarted | 0.892 / 0.896 / 0.894 | 0.271 / 0.289 / 0.284 | 0.071 / 0.084 / 0.073 |
+
+`chain`, paired McNemar against C1 on the same 1,000 items (difference [95% CI], exact p):
+
+| seed | C2 - C1 | A - C1 | B - C1 |
+|---|---|---|---|
+| 1 | -0.048 [-0.068, -0.028] p < 0.001 | -0.039 [-0.061, -0.017] p = 0.001 | -0.004 [-0.025, +0.017] p = 0.78 |
+| 2 | -0.045 [-0.068, -0.022] p < 0.001 | -0.046 [-0.069, -0.023] p < 0.001 | -0.025 [-0.046, -0.004] p = 0.022 |
+| 3 | -0.049 [-0.070, -0.028] p < 0.001 | -0.024 [-0.046, -0.002] p = 0.040 | -0.002 [-0.022, +0.018] p = 0.92 |
+
+Effects on `chain` (seed mean, item-bootstrap 95% interval; per-seed values; verdict by the pre-set rule):
+
+| effect | mean [95% CI] | per seed | verdict |
+|---|---|---|---|
+| restart cost (C1 - C2) | +0.047 [+0.035, +0.061] | +0.048 / +0.045 / +0.049 | **PRESENT** (replicates the pilot on fresh items) |
+| optimizer state kept (vs fresh) | +0.011 [+0.003, +0.018] | +0.006 / +0.012 / +0.014 | no verdict (below the +0.02 bar) |
+| one global schedule (vs restarted) | +0.037 [+0.026, +0.048] | +0.042 / +0.033 / +0.035 | **PRESENT** |
+| interaction | -0.001 [-0.017, +0.016] | -0.005 / +0.026 / -0.023 | absent |
+
+* **The restart cost is real in this setting and comes mostly from the learning-rate schedule.** With a global schedule, a fresh optimizer every segment (B) is within -0.004 / -0.025 / -0.002 of the continuous run; restarting the schedule (A, C2) costs 0.02-0.05. Keeping the Adam state adds about +0.01, which did not clear the pre-set bar.
+* `add` and `mul` show the same pattern (seed means: A lower than C1 by 0.039 on both, C2 by 0.025 on `add` and 0.041 on `mul`; B within 0.005 of C1); they were not part of the pre-set rule and are reported as observed.
+* What it does not separate: warm-up from the cosine decay to zero inside the schedule factor, and the relevance to the evolved arms (those also differed in data mix, rank and starting point and were not rerun under matched conditions). One model size, one task family, three seeds.
+* Practical consequence for the evolution loop (an inference, not a tested result): a child that trains with its own warm-up + decay-to-zero schedule loses about 0.04-0.05 on `chain` compared with the same steps inside one schedule. Using one global schedule across generations (or a non-decaying one) looks necessary before comparing a loop with plain training; carrying the
+  optimizer state is not needed (and across crossover or compression the parent's Adam state has no defined meaning, so resetting it is acceptable under a global schedule).

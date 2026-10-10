@@ -1,0 +1,157 @@
+{
+  "accuracy": {
+    "c1_s1": {
+      "add": 0.92,
+      "mul": 0.329,
+      "chain": 0.119
+    },
+    "c2_s1": {
+      "add": 0.892,
+      "mul": 0.271,
+      "chain": 0.071
+    },
+    "a_s1": {
+      "add": 0.885,
+      "mul": 0.275,
+      "chain": 0.08
+    },
+    "b_s1": {
+      "add": 0.915,
+      "mul": 0.32,
+      "chain": 0.115
+    },
+    "c1_s2": {
+      "add": 0.915,
+      "mul": 0.32,
+      "chain": 0.129
+    },
+    "c2_s2": {
+      "add": 0.896,
+      "mul": 0.289,
+      "chain": 0.084
+    },
+    "a_s2": {
+      "add": 0.889,
+      "mul": 0.285,
+      "chain": 0.083
+    },
+    "b_s2": {
+      "add": 0.915,
+      "mul": 0.301,
+      "chain": 0.104
+    },
+    "c1_s3": {
+      "add": 0.922,
+      "mul": 0.317,
+      "chain": 0.122
+    },
+    "c2_s3": {
+      "add": 0.894,
+      "mul": 0.284,
+      "chain": 0.073
+    },
+    "a_s3": {
+      "add": 0.865,
+      "mul": 0.289,
+      "chain": 0.098
+    },
+    "b_s3": {
+      "add": 0.924,
+      "mul": 0.33,
+      "chain": 0.12
+    }
+  },
+  "effects": {
+    "per_seed": [
+      {
+        "state": 0.006499999999999999,
+        "schedule": 0.0415,
+        "interaction": -0.005000000000000018,
+        "restart_cost": 0.048
+      },
+      {
+        "state": 0.012000000000000004,
+        "schedule": 0.032999999999999995,
+        "interaction": 0.02600000000000001,
+        "restart_cost": 0.045
+      },
+      {
+        "state": 0.013500000000000005,
+        "schedule": 0.0355,
+        "interaction": -0.023000000000000007,
+        "restart_cost": 0.049
+      }
+    ],
+    "mean": {
+      "state": 0.01066666666666667,
+      "schedule": 0.03666666666666666,
+      "interaction": -0.0006666666666666718,
+      "restart_cost": 0.04733333333333334
+    },
+    "interval": {
+      "state": [
+        0.002999999999999998,
+        0.0185
+      ],
+      "schedule": [
+        0.026,
+        0.04750000000000001
+      ],
+      "interaction": [
+        -0.016666666666666666,
+        0.016333333333333342
+      ],
+      "restart_cost": [
+        0.034999999999999996,
+        0.061
+      ]
+    },
+    "resamples": 2000
+  },
+  "verdicts": {
+    "restart_cost": "PRESENT",
+    "state": "NO VERDICT",
+    "schedule": "PRESENT",
+    "interaction": "ABSENT"
+  },
+  "fresh_data_sha256": {
+    "add": "475d7ac5818e71d45b3b24d5a71fe1ad0748a4508bbcbff867a4750181bd74b3",
+    "mul": "2b9ff84c36e68a19ac5d5548e2552cdc87b58dabbf676a7a6a704f31b8b0cf87",
+    "chain": "ca05c3be20c8dc93bc49203bda9e2bc2792c663c0389c05ef4acebe09fa97c11"
+  },
+  "adapter_sha256": {
+    "c1_s1": "05684d3567dcdfe03f8639150ce1ad31b8333bc58bc2201af62982a1a42fc55a",
+    "c2_s1": "0353414f6ecc09572b25c7402d0b8fbd263689972c70225a89cc9cdee2e44d06",
+    "a_s1": "0d56c16312377eee0c612183df1d07b6fbaf5560ab3b0ec36dca7de2707baf1b",
+    "b_s1": "b4e81e54530835fffa04543aee16fedd9c256ece152e3e3d6be81cfe6f357357",
+    "c1_s2": "a51bf30bebe6f90fc88a750e6fd379417df64740836fdd4adeb0f6ff86ec1601",
+    "c2_s2": "d09d530c02977513f324aa9f5b1a5f8d8dff4b350afb1f228be06e45302d859b",
+    "a_s2": "5e5c48408e83826042018e20b7845086ccb5adde2223445b50c68ccfd0225784",
+    "b_s2": "bebd5eda0ceb753431d6bc770afd2cb86912e81cfcd65bd5dd50d02606d79bff",
+    "c1_s3": "9efdad95ce80aaea3760c214fad9452c53298652d847865c752eaa0aab68d88b",
+    "c2_s3": "3382aead63a70a47e13a87a7cc9e5f938b0decc51af9f391458663c0a7a7d04a",
+    "a_s3": "ff4265dda519d137487ef36279d45d28d1f3cf65bf8767fa14a4dbf430d87252",
+    "b_s3": "77e272532f41a4e1b571b1063e8fa8b6d80d3fe7251b4737e18709d9782d7d60"
+  },
+  "config": {
+    "steps": 1200,
+    "segment": 200,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "mix": {
+      "add": 0.25,
+      "mul": 0.25,
+      "chain": 0.5
+    },
+    "fresh_items": 1000,
+    "rank": 32,
+    "stream_seeds": [
+      10001,
+      10002,
+      10003
+    ]
+  }
+}

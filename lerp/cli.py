@@ -143,6 +143,10 @@ def create_parser() -> argparse.ArgumentParser:
     pairs.add_argument("--against", nargs="+", default=None, help="baseline names (default: base and every parent)")
     pairs.add_argument("--out", "-o", type=Path, default=None, help="also write the rows as JSON")
 
+    evolve = commands.add_parser("evolve", help="Closed evolutionary learning loop: cross, learn verifiable problems, select, repeat (experimental)")
+    evolve.add_argument("--config", "-c", type=Path, required=True)
+    evolve.add_argument("--out", "-o", type=Path, required=True)
+
     compare = commands.add_parser("compare", help="Compare children with independently evaluated unmerged parents")
     compare.add_argument("--run", "-r", type=Path, required=True)
     compare.add_argument("--top", type=int, default=20)
@@ -324,6 +328,12 @@ def _run(args: argparse.Namespace) -> int:
             if len(item["genes"]) > 9:
                 g += ",..."
             print(f"{i:<5} {item['id']:<12} {score['fitness']:>10.5f} {score['source']:<16} {score.get('status', '-'):<18} {g}")
+        return 0
+
+    if args.command == "evolve":
+        from .evolution.orchestrator import load_config, run_evolution
+        result = run_evolution(load_config(args.config), args.out)
+        print(result["verdict"])
         return 0
 
     if args.command == "pairs":

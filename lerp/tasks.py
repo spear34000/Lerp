@@ -24,8 +24,10 @@ from the resident evaluator line up with ``lm-eval``.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
@@ -226,9 +228,24 @@ class TaskDefinition:
             raise TaskError(f"task {self.name}: label {label} outside {len(choices)} choices")
         return context, choices, label
 
+    def local_rows(self) -> list[dict]:
+        """Rows of a local JSONL dataset (``dataset: file:PATH``); the experiment pins it with a SHA-256 in the resident protocol."""
+        path = Path(self.dataset[len("file:"):])
+        try:
+            return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        except (OSError, ValueError) as exc:
+            raise TaskError(f"cannot read local dataset {path}: {exc}") from exc
+
+    def data_sha256(self) -> str | None:
+        if not self.dataset.startswith("file:"):
+            return None
+        return hashlib.sha256(Path(self.dataset[len("file:"):]).read_bytes()).hexdigest()
+
     def documents(self, lo: int, hi: int, rows: Sequence[Any] | None = None) -> list[tuple]:
         """Converted rows ``lo <= i < hi``. ``rows`` lets tests (and offline users) supply the dataset directly."""
         convert = self.convert_generative if self.generative else self.convert
+        if rows is None and self.dataset.startswith("file:"):
+            rows = self.local_rows()
         if rows is None:
             try:
                 from datasets import load_dataset

@@ -331,12 +331,52 @@ class CheckpointBlender:
                 pieces.append(acc)
             dst[lo:hi].copy_((torch.cat(pieces, 1) if len(pieces) > 1 else pieces[0]).to(dst.dtype))
 
-    def _run(self, sources: list[int], coefficient_for, base_weight: float | None) -> None:
+    def _merger(self, key: str, coefs: list[float], method: str, shape):
+        from .mergeops import TensorMerger, needs_base
+        torch = _torch()
+        offset = 0 if needs_base(method) else 1  # sources are indexes [base, parents...]; slerp has no base
+
+        def read_cpu(i: int, lo: int, hi: int):
+            handle = self.indexes[i + offset][key]
+            part = handle.get_slice(key)[lo:hi] if len(shape) else handle.get_tensor(key)
+            return part.float()
+
+        def read(i: int, lo: int, hi: int):
+            return read_cpu(i, lo, hi).to(self.device)
+
+        merger = TensorMerger(torch, method, coefs, shape=shape, key=key, task_scale=self.spec.task_scale,
+                              density=self.spec.density, seed=self.spec.seed, device=self.device)
+        return merger, read, read_cpu
+
+    def _blend_new_direct(self, dst, key: str, coefs: list[float], method: str) -> None:
+        merger, read, read_cpu = self._merger(key, coefs, method, tuple(dst.shape))
+        merger.merge(read, read_cpu, dst)
+
+    def _blend_new_experts(self, dst, kind: str, prefix: str, experts: int, coefs: list[float], method: str) -> None:
+        """Per-expert tensors are merged one by one - the same unit (and DARE hash key) the lite engine uses for the checkpoint tensors."""
+        names = ("gate_proj", "up_proj") if kind == "gate_up" else ("down_proj",)
+        for e in range(experts):
+            offset = 0
+            for part in names:
+                key = f"{prefix}.experts.{e}.{part}.weight"
+                shape = tuple(self.indexes[0][key].get_slice(key).get_shape())
+                merger, read, read_cpu = self._merger(key, coefs, method, shape)
+                merger.merge(read, read_cpu, dst[e, offset:offset + shape[0]])
+                offset += shape[0]
+
+    def _run(self, sources: list[int], coefficient_for, base_weight: float | None, method: str | None = None) -> None:
         torch = _torch()
         with torch.no_grad():
             for name, kind, source in self.plan:
                 dst = self.state[name]
                 if not dst.is_floating_point():
+                    continue
+                if method is not None:
+                    if kind == "direct":
+                        self._blend_new_direct(dst, source, coefficient_for(name), method)
+                    else:
+                        prefix, experts = source
+                        self._blend_new_experts(dst, kind, prefix, experts, coefficient_for(name), method)
                     continue
                 if kind == "direct":
                     self._blend_direct(dst, source, sources, coefficient_for(name), base_weight)
@@ -345,12 +385,15 @@ class CheckpointBlender:
                     self._blend_experts(dst, kind, prefix, experts, sources, coefficient_for(name), base_weight)
 
     def apply(self, genes: Sequence[float], method: str | None = None) -> None:
+        from .mergeops import NEW_METHODS
         method = method or self.spec.method
-        if method not in ("linear", "task_arithmetic"):
-            raise ResidentError(f"checkpoint blending supports linear and task_arithmetic, not {method}")
+        if method not in ("linear", "task_arithmetic", *NEW_METHODS):
+            raise ResidentError(f"checkpoint blending does not support the merge method {method}")
+        if method == "slerp" and len(self.spec.parents) != 2:
+            raise ResidentError("slerp merges exactly two parents")
         parents = list(range(1, len(self.indexes)))
         self._run(parents, lambda n: tensor_coefficients(self.spec, list(genes), n, self.n_layers),
-                  self.spec.task_scale if method == "task_arithmetic" else None)
+                  self.spec.task_scale if method == "task_arithmetic" else None, method if method in NEW_METHODS else None)
 
     def apply_reference(self, name: str) -> None:
         source = 0 if name == "base" else 1 + [p.name for p in self.spec.parents].index(name)

@@ -94,14 +94,13 @@ Small models on one 16 GB Intel Arc machine; sample sizes are 100-300 items per 
 | Supported | Notes |
 |---|---|
 | Linear and task-arithmetic merging | full checkpoints (`lite` engine, or MergeKit) and LoRA adapters (exact rank concatenation) |
+| SLERP, TIES, DARE-TIES, DARE-linear | full checkpoints only, own implementation in the `lite` engine and `lerp search` (identical numbers in both, DARE seeded); not bit-identical to MergeKit, quality not yet measured against linear (see RESULTS.md) |
 | Layer-wise and module-group-wise weights | attention / mlp / router / norm / embedding / other, plus a depth profile; routers of MoE models are their own group |
 | Search | evolution, GP + expected improvement, random; `lerp search` scores in seconds with a resident model |
 | Evaluation | log-likelihood multiple-choice and greedy-decoded exact-match tasks as YAML blocks; any lm-eval task through `lerp cycle` |
 
 | Not supported (today) | What happens instead |
 |---|---|
-| SLERP | not implemented |
-| Own TIES / DARE | only emitted as MergeKit recipes (`method: ties`, `dare_ties`, `dare_linear`); **no MergeKit run has been exercised here** and the resident evaluator and `lite` engine refuse them |
 | Training from the CLI | no `lerp train`; LoRA training is the script `experiments/train_lora.py` |
 | DoRA, AdaLoRA, rsLoRA-patterns, bias / `modules_to_save`, `rank_pattern`, embedding LoRA | the adapter is rejected with an error (`check`, `build`) |
 | Quantized inputs (GPTQ, AWQ, GGUF, bitsandbytes bases / QLoRA bases) | dequantize first; the merge needs the full-precision base |
@@ -129,7 +128,7 @@ tests/         150+ tests (numerical merge checks, crash recovery, GP, model fam
 
 ## Roadmap
 
-Planned, in order: paired statistics against the parents (McNemar), SLERP and in-house TIES / DARE for the `lite` engine and the resident evaluator, a measured skill-adapter demo (code / math / Korean LoRA at 4B),
+Planned, in order: paired statistics against the parents (McNemar), a measured skill-adapter demo (code / math / Korean LoRA at 4B),
 a profiled and faster candidate apply. Considered but not started: a `lerp train` command, a GGUF / llama.cpp evaluation backend, layer removal before merging.
 Out of scope: Dense <-> MoE conversion, dimension expansion, knowledge editing, custom GPU kernels.
 

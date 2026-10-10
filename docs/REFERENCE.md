@@ -22,7 +22,7 @@ Full command reference, mathematics and compatibility boundaries. For an overvie
 
 **Verified on Windows (2026-10-08):** `examples/offline_peft_equivalence.py` passes (max logits error 6.7e-8); a full-checkpoint `lite` merge and a LoRA merge of real Qwen2.5-0.5B models build, load in Transformers/PEFT and generate; `lm-eval` 0.4.13 ran on the merged outputs (30-item smoke run; differences between models were within noise).
 
-**Still unverified:** quality improvement over parent models, trained (non-random) LoRA parents, the MergeKit CLI (TIES/DARE), models above 1.5B, GPU/XPU execution.
+**Still unverified:** quality improvement over parent models, trained (non-random) LoRA parents, the MergeKit CLI, models above 1.5B, GPU/XPU execution.
 
 ## Install
 
@@ -266,6 +266,23 @@ python -m lerp lineage -r runs/lora -o runs/lineage.dot
 ```
 
 Automatic export requires an `lm_eval`-scored candidate; manual scores are unverified, and **the tool cannot guarantee the external evaluator was truthful**. Only recipes and metrics, not full LLM weights, are exported. Verify licenses independently before distributing model artifacts.
+
+## Merge methods for full checkpoints
+
+`method:` accepts `linear`, `task_arithmetic`, `slerp`, `ties`, `dare_ties` and `dare_linear` (LoRA experiments: `linear`, `task_arithmetic`). The last four are implemented in `lerp/mergeops.py` and used by both the `lite`
+engine and `lerp search`, so a blend scored in place and the checkpoint `lerp build --engine lite` writes are the same numbers (tested on tiny dense and mixture-of-experts models). Genome weights `w_i` come from the usual
+per-group profile; `density`, `task_scale` and `seed` are experiment settings.
+
+| method | parents | definition |
+|---|---|---|
+| `slerp` | exactly 2 | per tensor, spherical interpolation of the flattened parents with `t` = weight of the second parent; linear interpolation when the parents are almost parallel (cosine > 0.9995) |
+| `ties` | 2-6 + base | task vectors `d_i = P_i - base`; keep each parent's largest-magnitude `density` fraction; elect the sign of `sum w_i d_i`; average the entries that agree (weights normalized over the agreeing parents); `base + task_scale * merged` |
+| `dare_ties` | 2-6 + base | drop each task-vector entry with probability `1 - density`, rescale the rest by `1 / density`, then the TIES election |
+| `dare_linear` | 2-6 + base | DARE, then `base + task_scale * sum w_i d_i` |
+
+Determinism: the DARE drop decision of an element is a hash of (`seed`, tensor name, parent, element index), so it is identical on CPU and accelerator, for any block size and for the fused-expert layout. The TIES magnitude
+threshold is exact up to 64M elements per tensor and estimated from every n-th row above that. These are the algorithms of the papers, **not bit-identical to MergeKit**. `slerp` has no MergeKit recipe here; with `--engine mergekit` it is refused.
+Fused-expert models apply these methods expert by expert in `lerp search` (slower than linear blending, which stacks experts).
 
 ## Mathematical notes
 

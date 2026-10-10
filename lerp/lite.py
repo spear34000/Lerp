@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .weighting import language_layer_count, tensor_coefficients
+from .mergeops import NEW_METHODS, needs_base
 from .spec import Spec
 
 
@@ -88,6 +89,31 @@ def _merge_large_tensor(key: str, slices: list, weights: list[float], method: st
     return output
 
 
+def _merge_new_method(key: str, handles: list, weights: list[float], method: str, spec: Spec, cast_to, torch):
+    """SLERP / TIES / DARE for one tensor (see lerp.mergeops); ``handles`` are the safetensors handles of [base] + parents (or parents)."""
+    from .mergeops import TensorMerger
+    shapes = [tuple(h.get_slice(key).get_shape()) for h in handles]
+    dtypes = {h.get_slice(key).get_dtype() for h in handles}
+    if any(s != shapes[0] for s in shapes) or len(dtypes) != 1:
+        raise LiteMergeError(f"Tensor shape or dtype mismatch: {key}")
+    shape = shapes[0]
+
+    def read_cpu(i: int, lo: int, hi: int):
+        handle = handles[i]
+        part = handle.get_slice(key)[lo:hi] if shape else handle.get_tensor(key)
+        if not torch.isfinite(part).all():
+            raise LiteMergeError(f"Non-finite parent tensors: {key}")
+        return part.float()
+
+    merger = TensorMerger(torch, method, weights, shape=shape, key=key, task_scale=spec.task_scale, density=spec.density,
+                          seed=spec.seed, device="cpu")
+    output = torch.empty(shape, dtype=cast_to)
+    merger.merge(read_cpu, read_cpu, output)
+    if not torch.isfinite(output).all():
+        raise LiteMergeError(f"Merged tensor overflowed target dtype: {key}")
+    return output
+
+
 def build_lite(spec: Spec, genes: list[float], destination: Path, *, max_shard_mb: int = 128, method: str | None = None) -> dict:
     """Produce actual HF-format safetensors tensors in destination.
 
@@ -97,8 +123,10 @@ def build_lite(spec: Spec, genes: list[float], destination: Path, *, max_shard_m
     if spec.mode != "full":
         raise LiteMergeError("Use --engine lora for LoRA adapters")
     chosen_method = method or spec.method
-    if chosen_method not in {"linear", "task_arithmetic"}:
-        raise LiteMergeError(f"Lite supports linear/task_arithmetic, not {chosen_method}. Use --engine mergekit")
+    if chosen_method not in {"linear", "task_arithmetic", *NEW_METHODS}:
+        raise LiteMergeError(f"Lite supports linear, task_arithmetic, slerp, ties, dare_ties and dare_linear, not {chosen_method}. Use --engine mergekit")
+    if chosen_method == "slerp" and len(spec.parents) != 2:
+        raise LiteMergeError("slerp merges exactly two parents")
     if max_shard_mb < 1:
         raise LiteMergeError("max_shard_mb must be positive")
     try:
@@ -109,7 +137,7 @@ def build_lite(spec: Spec, genes: list[float], destination: Path, *, max_shard_m
         raise LiteMergeError('Install the CPU dependencies: pip install -e ".[lite]"') from exc
 
     source_roots = [Path(p.model) for p in spec.parents]
-    if chosen_method != "linear":
+    if needs_base(chosen_method):
         source_roots = [Path(spec.base_model)] + source_roots
     for root in source_roots:
         _source_files(root)
@@ -119,7 +147,7 @@ def build_lite(spec: Spec, genes: list[float], destination: Path, *, max_shard_m
         raise LiteMergeError(f"Destination not empty: {destination}")
     destination.mkdir(parents=True, exist_ok=True)
 
-    config_source = Path(spec.base_model) if chosen_method != "linear" else Path(spec.parents[0].model)
+    config_source = Path(spec.base_model) if needs_base(chosen_method) else Path(spec.parents[0].model)
     config = json.loads((config_source / "config.json").read_text(encoding="utf-8"))
     num_layers = language_layer_count(config)
     if type(num_layers) is not int or num_layers < 1:
@@ -158,6 +186,17 @@ def build_lite(spec: Spec, genes: list[float], destination: Path, *, max_shard_m
 
         for key in sorted(expected_keys):
             slices = [index[key].get_slice(key) for index in sources]
+            if chosen_method in NEW_METHODS and slices[0].get_dtype() in _FLOAT_DTYPES:
+                weights = _merge_weights_for_tensor(genes, spec, key, num_layers)
+                output = _merge_new_method(key, [index[key] for index in sources], weights, chosen_method, spec, cast_to, torch)
+                size = output.numel() * output.element_size()
+                if tensor_buffer and buffer_size + size > shard_limit:
+                    flush()
+                tensor_buffer[key] = output
+                buffer_size += size
+                total_size += size
+                del output, slices
+                continue
             if (math.prod(slices[0].get_shape()) > LARGE_TENSOR_ELEMS and len(slices[0].get_shape()) >= 1
                     and slices[0].get_dtype() in _FLOAT_DTYPES):
                 weights = _merge_weights_for_tensor(genes, spec, key, num_layers)

@@ -254,3 +254,22 @@ Best candidate (g0-c3, fitness 0.739) against the parents:
 Reading: the blend keeps each parent's strength (equal on its own task) and gains on the other parent's task, but against the *better parent per task* no difference is significant at 150 items
 (pooled against the ARC parent +0.033, p = 0.18). Caveats: the winner was chosen on these same items (selection bias favours it; `lerp validate` on fresh items is the real test), four candidates and nine comparisons
 were looked at without multiplicity correction, and the earlier +0.07 result on fresh items (see above) is the better evidence for this pair.
+
+## New merge methods on a real checkpoint pair (OLMoE-1B-7B, `experiments/merge_methods_check.py`)
+
+SLERP, TIES, DARE-TIES and DARE-linear (`lerp/mergeops.py`) applied in place by the resident evaluator to OLMoE-1B-7B Instruct and pretrained (the pretrained model is also the base, so its task vector is zero and the
+task-vector methods effectively move toward the Instruct model only), weight 0.5 for every group, density 0.5, task_scale 1, seed 5, 100 items per task, bf16 on the Arc 140V. One run, one seed.
+
+| model | arc_easy | boolq | apply | score |
+|---|---:|---:|---:|---:|
+| instruct | 0.74 | 0.75 | - | 83 s (first, includes warm-up) |
+| pretrained | 0.74 | 0.72 | - | 34 s |
+| linear | 0.75 | 0.78 | 30 s | 18 s |
+| slerp | 0.75 | 0.79 | 62 s | 19 s |
+| ties | 0.77 | 0.73 | 214 s | 19 s |
+| dare_ties | 0.76 | 0.77 | 88 s | 19 s |
+| dare_linear | 0.76 | 0.74 | 76 s | 20 s |
+
+Every difference is within the noise of 100 items (standard error about 0.04): **no method is shown to be better than linear** here. What the run establishes is that the methods execute on a 6.9B-parameter mixture-of-experts
+checkpoint with sane scores. Their equality with the `lite` engine is established on tiny models in the tests, not at this scale. Cost: because fused experts are merged expert by expert and TIES needs an order
+statistic per tensor on the CPU, applying a candidate takes 2-7x longer than linear blending (30 s -> 62-214 s); the apply step is the target of the planned speed work.

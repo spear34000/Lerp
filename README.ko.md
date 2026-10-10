@@ -61,14 +61,13 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 | 지원 | 비고 |
 |---|---|
 | Linear, Task Arithmetic 병합 | 전체 체크포인트(`lite` 엔진 또는 MergeKit)와 LoRA(랭크 이어붙이기로 정확히 병합) |
+| SLERP, TIES, DARE-TIES, DARE-linear | 전체 체크포인트 전용. `lite` 엔진과 `lerp search`의 자체 구현(두 경로 결과 동일, DARE는 시드 고정). MergeKit과 비트 단위로 같지 않고, linear 대비 품질은 아직 측정 전(RESULTS.md 참고) |
 | 층별, 모듈 그룹별 가중치 | attention / mlp / router / norm / embedding / other + 깊이 프로파일. MoE 라우터는 별도 그룹 |
 | 탐색 | 진화, GP + 기대 개선, 무작위. `lerp search`는 상주 모델로 후보당 몇 초 |
 | 평가 | YAML 블록으로 쓰는 객관식 로그확률 과제와 greedy 생성형 exact match 과제, `lerp cycle`로 lm-eval의 모든 과제 |
 
 | 미지원 (현재) | 대신 일어나는 일 |
 |---|---|
-| SLERP | 미구현 |
-| 자체 TIES / DARE | MergeKit 레시피로만 생성(`ties`, `dare_ties`, `dare_linear`). **MergeKit 실행은 이 환경에서 검증하지 않았고** 상주 평가기와 `lite` 엔진은 거부합니다 |
 | 학습 CLI | `lerp train` 없음. LoRA 학습은 `experiments/train_lora.py` 스크립트 |
 | DoRA, AdaLoRA, `rank_pattern`, bias / `modules_to_save`, 임베딩 LoRA | 어댑터를 오류로 거부(`check`, `build`) |
 | 양자화 입력 (GPTQ, AWQ, GGUF, bitsandbytes 베이스 / QLoRA 베이스) | 먼저 dequantize 필요. 병합에는 완전 정밀도 베이스가 필요 |
@@ -86,7 +85,7 @@ Windows에서는 `PYTHONUTF8=1`을 설정하세요.
 
 ## 로드맵
 
-계획(순서대로): 부모 대비 쌍체 통계(McNemar), `lite` 엔진과 상주 평가기용 SLERP와 자체 TIES / DARE, 4B 코드·수학·한국어 LoRA 병합 실측, 후보 적용 속도 개선.
+계획(순서대로): 부모 대비 쌍체 통계(McNemar), 4B 코드·수학·한국어 LoRA 병합 실측, 후보 적용 속도 개선.
 검토만 한 것(시작 전): `lerp train` 명령, GGUF / llama.cpp 평가 백엔드, 병합 전 층 제거. 하지 않을 것: Dense <-> MoE 변환, 차원 확장, 지식 편집, 자체 GPU 커널.
 
 ## 라이선스

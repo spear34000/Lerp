@@ -7,6 +7,11 @@ from .spec import Spec
 
 def mergekit_config(spec: Spec, genes: list[float], *, method: str | None = None) -> dict:
     chosen_method = method or spec.method
+    if chosen_method == "slerp":  # implemented by lerp's own engines; no MergeKit recipe is emitted
+        if len(spec.parents) != 2:
+            raise ValueError("slerp merges exactly two parents")
+        return {"merge_method": "slerp", "backend": "lerp_only", "note": "SLERP runs in the lite engine and the resident evaluator",
+                "genome": list(genes), "gene_groups": list(spec.gene_groups)}
     if chosen_method not in {"linear", "task_arithmetic", "ties", "dare_ties", "dare_linear"}:
         raise ValueError(f"Invalid concrete merge method: {chosen_method}")
     if len(genes) != spec.genome_size:

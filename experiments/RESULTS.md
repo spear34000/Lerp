@@ -321,3 +321,34 @@ Findings (searched blend; the 0.5 blend is within 0.005 of it everywhere):
 
 What this shows and does not show: for two clearly complementary skills, merging two small LoRAs recovers essentially all of the benefit of joint training and beats each parent by roughly +0.02 to +0.06 on fresh items, robustly across seeds. It does not show
 "noticeably better than existing models" nor better than joint training; only one task pair at 0.5B shows a gain and the requested bar was not met.
+
+## Evolution loop after the fixes: crossover ablation (`experiments/evolution_ablation.py`): **no arm beats plain training**
+
+Fixes applied after the diagnosis of the first run, all switchable in the config: `graft` crossover (`child = A + (B - init_B)`, so shared ancestry is counted once, with the start adapter of every organism kept), adapters stored at the scale of
+freshly trained ones (alpha = 2r; the first run's inherited adapters learned at half speed), a single ranking key for survivor selection and the final pick, fitness that weights the new skill 2x, the forgetting gate anchored to the founders' dev scores, 300 dev and 600 test items per
+family. Arms differ **only** in the crossover (`graft`, the original `blend`, and `none` = each child keeps training a survivor); they share the same founders, the same control, the same total training steps (1200 = 3 generations x 2 children x 200) and the same test items.
+Qwen2.5-0.5B, same arithmetic families as before, seed 1, ~100 min wall clock for the three arms and the control.
+
+| model | add | mul | chain (new) | steps in final lineage / discarded |
+|---|---:|---:|---:|---:|
+| base | 0.585 | 0.233 | 0.005 | |
+| founder add / founder mul | 0.915 / 0.783 | 0.278 / 0.342 | 0.008 / 0.020 | |
+| merge-only (0.5, no learning) | 0.927 | 0.327 | 0.012 | |
+| **plain training control** (1200 steps) | 0.930 | 0.355 | **0.115** | |
+| evolved, `blend` (g2-c0) | 0.890 | 0.318 | 0.097 | 400 / 800 |
+| evolved, `graft` (g1-c0) | 0.892 | 0.325 | 0.085 | 200 / 1000 |
+| evolved, `none` (g2-c0) | 0.892 | 0.345 | 0.093 | 400 / 800 |
+
+Paired comparisons on the new skill (600 items, same items for every model; difference [95% CI], exact McNemar p):
+
+* every arm beats the best founder clearly (+0.065 to +0.077, p < 0.0001): the loop does learn the new skill;
+* arm minus control: blend -0.018 [-0.045, +0.009] p = 0.22; graft -0.030 [-0.058, -0.001] p = 0.051; none -0.022 [-0.047, +0.004] p = 0.12. **No arm beats the control; all point below it.**
+* arm against arm: blend - graft +0.012 (p = 0.47), blend - none +0.003 (p = 0.89), graft - none -0.008 (p = 0.62): **the crossover mode makes no measurable difference**, including no crossover at all.
+* old skills: every arm ends 0.017-0.025 below the best founder on `add` and `mul` (inside the 0.05 tolerance, but nonzero) except `none` on `mul` (+0.003).
+
+What the logs show. `graft` got stuck: from generation 2 every child was rejected by the founder-anchored forgetting gate (their `add`/`mul` dev scores dropped 0.05-0.1 below the founders'), so the survivor set never changed and 1000 of its 1200 training steps were discarded.
+Summing two skills' full deltas plus learning enlarges the update; with the gate now anchored, that is rejected rather than ratcheted into the population. `blend` and `none` kept a lineage of two generations (400 steps), also discarding 800.
+All three arms spend two thirds of their steps on children that never reach the final organism, while the control spends all 1200 on one adapter. That structural waste, not the crossover formula, is the best explanation of the gap that remains.
+
+Compared with the first run (blend, unfixed): the gap to the control shrank from -0.050 (p = 0.024) to -0.018 (p = 0.22) and the evolved model is no longer significantly worse, but several things changed at once (scale, fitness, dev size, fewer and longer children), so this cannot be attributed to any single fix. One seed, one model size, one new skill:
+the result does not say evolution can never help, it says that here none of the variants shows a benefit over simply training one adapter for the same number of steps.

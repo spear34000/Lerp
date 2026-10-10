@@ -1,0 +1,27 @@
+
+=== s1: test items per family 600, steps {'evolution': 1200, 'control': 1200} ===
+model                           add      mul    chain    steps in lineage / discarded
+base                          0.585    0.233    0.005
+g0-add                        0.915    0.278    0.008
+g0-mul                        0.783    0.342    0.020
+merge-only                    0.927    0.327    0.012
+control-plain                 0.930    0.355    0.115
+evolved/blend (g2-c0)         0.890    0.318    0.097             400 /  800
+evolved/graft (g1-c0)         0.892    0.325    0.085             200 / 1000
+evolved/none (g2-c0)          0.892    0.345    0.093             400 /  800
+
+new skill (chain), paired McNemar on the same test items [95% CI], p
+  blend - control-plain                    -0.018 [-0.045,+0.009]  p=0.2215  (28 vs 39)
+  blend - best founder (g0-mul)            +0.077 [+0.051,+0.102]  p=0.0000  (54 vs 8)
+  graft - control-plain                    -0.030 [-0.058,-0.001]  p=0.0505  (29 vs 47)
+  graft - best founder (g0-mul)            +0.065 [+0.042,+0.087]  p=0.0000  (44 vs 5)
+  none - control-plain                     -0.022 [-0.047,+0.004]  p=0.1237  (24 vs 37)
+  none - best founder (g0-mul)             +0.073 [+0.049,+0.097]  p=0.0000  (51 vs 7)
+  blend - graft                            +0.012 [-0.016,+0.039]  p=0.4704  (38 vs 31)
+  blend - none                             +0.003 [-0.021,+0.027]  p=0.8919  (28 vs 26)
+  graft - none                             -0.008 [-0.035,+0.018]  p=0.6201  (30 vs 35)
+
+old skills: evolved minus best founder
+  blend   add -0.025  mul -0.023   verdict: learned and retained, but NOT shown to beat plain training
+  graft   add -0.023  mul -0.017   verdict: learned and retained, but NOT shown to beat plain training
+  none    add -0.023  mul +0.003   verdict: learned and retained, but NOT shown to beat plain training

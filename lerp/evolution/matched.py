@@ -9,6 +9,10 @@ Everything that earlier comparisons let differ is fixed here to what the plain-t
 * learning-rate schedule: ONE global warm-up + cosine over the lineage (``generations * child_steps`` steps); a child of generation g trains the slice
   ``[(g-1) child_steps, g child_steps)`` of it with a fresh optimizer (the 2x2 restart experiment found the optimizer state immaterial under a global schedule).
   An optimizer-state transfer across a cross is therefore not needed and not attempted;
+* selection: COMMA selection - the next parents are the best children of the generation just trained, and the parents are not candidates again. With one
+  global schedule a parent is by definition an earlier, less-trained checkpoint of the lineage, so "parents compete with their children" (plus selection) lets
+  the founders win forever and the lineage never advances (seen in the first attempt, before any final score existed). The founder-anchored forgetting gate is
+  off here for the same reason (it rejects every mid-schedule checkpoint) and stays available as ``gate=True``;
 * cost: the control gets as many training steps as ALL children together (``generations * children * child_steps``); selection evaluations are counted too.
 
 Selection uses the dev split only; the final comparison uses the shared fresh items. The decision rule is in ``experiments/matched_evolution.py``.
@@ -54,6 +58,8 @@ class MatchedConfig:
     accum: int = 2
     max_new_tokens: int = 12
     seed: int = 1
+    selection: str = "comma"          # "comma": parents come from this generation's children only; "plus": parents compete with their children
+    gate: bool = False                # founder-anchored forgetting gate (see orchestrator.forgotten)
 
     @property
     def lineage_steps(self) -> int:
@@ -143,13 +149,14 @@ def run_matched(cfg: MatchedConfig, out: Path, *, log: Callable[[str], None] = p
         score_dev(children)
         pool = [archive.organisms[i] for i in survivors]
         for c in children:
-            lost = forgotten(c.dev, anchor, cfg.founders, CRITERIA["retention_tolerance"])
+            lost = forgotten(c.dev, anchor, cfg.founders, CRITERIA["retention_tolerance"]) if cfg.gate else []
             c.status = "candidate" if not lost else f"rejected:forgot {','.join(lost)}"
             archive.record(c)
             log(f"  {c.id} <- {c.parents} w={c.weights[0]}  dev {c.dev}  fitness {fitness(c.dev, ecfg):.3f}  {c.status}  "
                 f"(pre-training energy kept {c.training['pre_training_compression']['energy_kept']:.3f})")
         admitted = [c for c in children if c.status == "candidate"]
-        ranked_all = sorted(pool + admitted, key=lambda o: rank_key(o, ecfg))
+        candidates = admitted if cfg.selection == "comma" and len(admitted) >= 2 else admitted + pool   # comma needs two children to pick parents from
+        ranked_all = sorted(candidates, key=lambda o: rank_key(o, ecfg))
         keep = [o.id for o in ranked_all[:cfg.survivors]]
         for o in pool + children:
             o.status = "survivor" if o.id in keep else (o.status if o.status.startswith("rejected") else "dropped")
@@ -157,7 +164,7 @@ def run_matched(cfg: MatchedConfig, out: Path, *, log: Callable[[str], None] = p
         survivors = keep
         log(f"generation {g}: survivors {survivors}")
 
-    best = min((archive.organisms[i] for i in survivors), key=lambda o: rank_key(o, ecfg))
+    best = min((archive.organisms[i] for i in survivors), key=lambda o: rank_key(o, ecfg))   # the same key as the selection above
     best.status = "final"
     archive.record(best)
 

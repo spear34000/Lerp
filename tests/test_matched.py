@@ -103,3 +103,35 @@ def test_a_cross_wider_than_the_training_rank_is_compressed_before_training_and_
         assert comp["rank_in"] == 8 and comp["rank_out"] == 4 and 0.0 < comp["energy_kept"] < 1.0
         assert json.loads((arc.root / o.adapter / "adapter_config.json").read_text())["r"] == 4
     assert [c["rank_out"] for c in result["cost"]["compressions"]] == [4] * 4
+
+
+def test_comma_selection_advances_the_lineage_even_when_the_parents_score_higher(tmp_path, monkeypatch):
+    """With a global schedule the children are mid-training checkpoints and score below their parents; plus selection would keep the founders forever."""
+    base, work = _workdir(tmp_path)
+    # make every founder look better than any child on the dev split
+    real = matched.fitness
+
+    def biased(dev, cfg):
+        return real(dev, cfg) + (1.0 if dev.get("_founder") else 0.0)
+
+    class Dev:
+        def __init__(self, inner):
+            self.inner, self.spare = inner, []
+
+        def score(self, adapters, window):
+            acc, items = self.inner.score(adapters, window)
+            for name in adapters:
+                if name.startswith("g0-"):
+                    acc[name] = {**acc[name], "_founder": 1.0}
+            return acc, items
+
+    from lerp.evolution.orchestrator import Evaluator, EvolutionConfig
+    ecfg = matched._eval_cfg(_cfg(base, work))
+    dev = Dev(Evaluator(ecfg, __import__("pathlib").Path(work) / "data", FAMS))
+    monkeypatch.setattr(matched, "fitness", biased)
+    monkeypatch.setattr(matched, "rank_key", lambda o, cfg: (-biased(o.dev, cfg), o.id))
+    res_comma = run_matched(_cfg(base, work, generations=2), tmp_path / "comma", log=lambda m: None, dev_evaluator=dev)
+    arc = Archive(tmp_path / "comma" / "archive")
+    assert res_comma["best"].startswith("g2-")   # the lineage reached the last generation
+    res_plus = run_matched(_cfg(base, work, generations=2, selection="plus"), tmp_path / "plus", log=lambda m: None, dev_evaluator=dev)
+    assert res_plus["best"].startswith("g0-")    # the failure mode that comma selection removes

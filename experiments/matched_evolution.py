@@ -4,7 +4,10 @@ Matched: same base model, same start (the 0.5/0.5 combination of the founders), 
 same learning rate, ONE global warm-up + cosine schedule per lineage (the control: 1,200 steps; the evolution lineage: 3 x 200 = 600 steps), no optimizer-state
 transfer, the same fresh test items (1,000 per family, never used for training or selection), and the same training COST: the control trains as many steps as
 all six children together (3 generations x 2 children x 200 = 1,200); selection evaluations are counted and reported. The evolution arm additionally compresses a cross
-of two rank-32 parents back to rank 32 before training (extra step, energy kept recorded). The controls are the three continuous runs of the restart experiment
+of two rank-32 parents back to rank 32 before training (extra step, energy kept recorded). Selection: COMMA (next parents = the best children of the generation just trained, parents are not candidates again) and no forgetting gate. A first attempt with plus
+selection and the founder-anchored gate was stopped in generation 1, before any final score existed: with one global schedule the children are mid-training
+checkpoints that score below the founders on the dev split, so every child was rejected and the lineage could not advance. The change was made for that reason only.
+The controls are the three continuous runs of the restart experiment
 (`controls/s1..s3`, already trained, stream seeds 10001-10003).
 
 Rule, fixed before running (new skill = `chain`; D = evolved - control on the fresh items, per seed s, and its mean over the 3 seeds):

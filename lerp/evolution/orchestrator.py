@@ -56,7 +56,7 @@ class EvolutionConfig:
     generations: int = 3
     children: int = 2
     survivors: int = 2
-    crossover: str = "graft"
+    crossover: str = "blend"      # graft was chosen before any data and stalled in the ablation; see experiments/RESULTS.md
     cross_weights: list[float] = field(default_factory=lambda: [0.3, 0.5, 0.7])   # blend mode only
     replay_fraction: float = 0.5
     new_skill_weight: float = 2.0     # fitness = weighted mean of the dev accuracies; the new skill counts this many times

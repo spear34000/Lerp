@@ -327,7 +327,7 @@ What this shows and does not show: for two clearly complementary skills, merging
 Fixes applied after the diagnosis of the first run, all switchable in the config: `graft` crossover (`child = A + (B - init_B)`, so shared ancestry is counted once, with the start adapter of every organism kept), adapters stored at the scale of
 freshly trained ones (alpha = 2r; the first run's inherited adapters learned at half speed), a single ranking key for survivor selection and the final pick, fitness that weights the new skill 2x, the forgetting gate anchored to the founders' dev scores, 300 dev and 600 test items per
 family. Arms differ **only** in the crossover (`graft`, the original `blend`, and `none` = each child keeps training a survivor); they share the same founders, the same control, the same total training steps (1200 = 3 generations x 2 children x 200) and the same test items.
-Qwen2.5-0.5B, same arithmetic families as before, seed 1, ~100 min wall clock for the three arms and the control.
+Qwen2.5-0.5B, same arithmetic families as before, seed 1; 96 min of wall clock in total (graft 35 min including the shared founders and the shared control, blend 27, none 34).
 
 | model | add | mul | chain (new) | steps in final lineage / discarded |
 |---|---:|---:|---:|---:|
@@ -346,9 +346,21 @@ Paired comparisons on the new skill (600 items, same items for every model; diff
 * arm against arm: blend - graft +0.012 (p = 0.47), blend - none +0.003 (p = 0.89), graft - none -0.008 (p = 0.62): **the crossover mode makes no measurable difference**, including no crossover at all.
 * old skills: every arm ends 0.017-0.025 below the best founder on `add` and `mul` (inside the 0.05 tolerance, but nonzero) except `none` on `mul` (+0.003).
 
-What the logs show. `graft` got stuck: from generation 2 every child was rejected by the founder-anchored forgetting gate (their `add`/`mul` dev scores dropped 0.05-0.1 below the founders'), so the survivor set never changed and 1000 of its 1200 training steps were discarded.
-Summing two skills' full deltas plus learning enlarges the update; with the gate now anchored, that is rejected rather than ratcheted into the population. `blend` and `none` kept a lineage of two generations (400 steps), also discarding 800.
-All three arms spend two thirds of their steps on children that never reach the final organism, while the control spends all 1200 on one adapter. That structural waste, not the crossover formula, is the best explanation of the gap that remains.
+What the logs show (facts): `graft` got stuck - from generation 2 every child was rejected by the founder-anchored forgetting gate (their `add`/`mul` dev scores were 0.05-0.1 below the founders'),
+so the survivor set never changed and 1000 of its 1200 training steps were discarded; its final organism comes from generation 1 (200 lineage steps), so **this ablation never exercised the accumulation hypothesis that graft was built for**.
+`blend` and `none` kept a lineage of two generations (400 steps) and discarded 800. Every arm spends two thirds of its steps on children that never reach the final organism, while the control spends all 1200 on one adapter.
+The `control-plain` and `merge-only` rows are bit-identical across the three arms' result files (same adapter, same items), so the cross-arm comparisons carry no scoring noise from them.
+
+Resolution: with one seed and 600 items the arm-versus-arm intervals are about +-0.027, so differences smaller than roughly 0.03 cannot be seen; "no measurable difference between crossover modes" means exactly that, not that they are equal.
+Graft against the control is borderline (CI excludes 0, p = 0.0505), not significant.
+
+Candidate explanations for the remaining gap to the control, **all untested**:
+
+1. The structural waste above (two thirds of the steps never reach the final organism).
+2. Re-compression every generation (rank 32 -> 16 keeps only 83-99% of the energy; the control is compressed once, at the end).
+3. Every child restarts the optimizer and a 20-step warm-up inside its 200 steps; the control does this once.
+4. A flaw in the graft itself (a hypothesis): the stored `B` is the compressed version of the trained adapter but `init_B` is not, so `B - init_B` is not exactly "what B learned"; it also contains minus B's truncation residual, which lies mostly in the founders' subspace. Each graft would then strip some
+   founder content, consistent with the `add`/`mul` drops that tripped the gate - but the summing of two skills' full deltas could equally explain it, and neither was checked.
 
 Compared with the first run (blend, unfixed): the gap to the control shrank from -0.050 (p = 0.024) to -0.018 (p = 0.22) and the evolved model is no longer significantly worse, but several things changed at once (scale, fitness, dev size, fewer and longer children), so this cannot be attributed to any single fix. One seed, one model size, one new skill:
 the result does not say evolution can never help, it says that here none of the variants shows a benefit over simply training one adapter for the same number of steps.

@@ -232,3 +232,25 @@ Agreement with lm-eval is exact on this one comparison, but 3 correct answers ou
 Batched left-padded decoding against one-prompt-at-a-time decoding: 4/4 identical extracted answers in float32, 2/4 in bf16. The difference is numerical (a different batch shape changes bf16 rounding and a
 greedy decode of 128+ tokens diverges after one flipped token), so generative scores carry batch-composition noise on top of the sampling error. The first candidate of a session takes several minutes (warm-up
 kernels), later ones 7-30 s for 8-30 prompts. The tiny-model tests pin the padding logic (batched = single in float32, any batch size).
+
+## Paired item-level comparison (`lerp pairs`, McNemar)
+
+`lerp search` now stores the 0/1 outcome of every scored item (`items.json` next to each score); `lerp pairs -r RUN -g G -i I` compares a candidate with the base and each parent
+item by item: exact McNemar test on the discordant items and a 95% interval for the accuracy difference (Wald with +0.5 per cell, Agresti-Min). `compare-samples` adds the same block for
+binary scores. Exactness is tested against the binomial tail (8 vs 2 discordant -> p = 0.1094).
+
+Real run: Qwen2.5-0.5B, ARC-Easy LoRA + BoolQ LoRA, 150 items per task, one generation of 4 candidates (4 fixed weights), bf16 on the Arc 140V (7 s per candidate, 7 s per baseline).
+Best candidate (g0-c3, fitness 0.739) against the parents:
+
+| vs | task | cand | baseline | diff [95% CI] | only cand / only base | p |
+|---|---|---:|---:|---|---:|---:|
+| arc LoRA | arc_easy | 0.707 | 0.707 | +0.000 [-0.056, +0.056] | 9 / 9 | 1.000 |
+| arc LoRA | boolq | 0.787 | 0.720 | +0.067 [-0.003, +0.134] | 19 / 9 | 0.087 |
+| arc LoRA | pooled | 0.747 | 0.713 | +0.033 [-0.011, +0.077] | 28 / 18 | 0.184 |
+| boolq LoRA | arc_easy | 0.707 | 0.620 | +0.087 [+0.019, +0.152] | 20 / 7 | 0.019 |
+| boolq LoRA | boolq | 0.787 | 0.773 | +0.013 [-0.021, +0.047] | 4 / 2 | 0.688 |
+| boolq LoRA | pooled | 0.747 | 0.697 | +0.050 [+0.012, +0.087] | 24 / 9 | 0.014 |
+
+Reading: the blend keeps each parent's strength (equal on its own task) and gains on the other parent's task, but against the *better parent per task* no difference is significant at 150 items
+(pooled against the ARC parent +0.033, p = 0.18). Caveats: the winner was chosen on these same items (selection bias favours it; `lerp validate` on fresh items is the real test), four candidates and nine comparisons
+were looked at without multiplicity correction, and the earlier +0.07 result on fresh items (see above) is the better evidence for this pair.

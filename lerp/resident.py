@@ -128,14 +128,16 @@ class Scorer:
 
     def accuracy(self, loglik: dict[int, float]) -> dict[str, float]:
         metrics = {}
+        self.outcomes: dict[str, list[int]] = {}
         for name, kind in self.kinds.items():
             docs = sorted(d for (task, d) in self.gold if task == name)
-            hits = 0
+            outcomes = []
             for d in docs:
                 indexes = self.by_doc[(name, d)]
                 values = [loglik[i] / (self.char_len[(name, d, self.requests[i][2])] if kind == "acc_norm" else 1.0) for i in indexes]
-                hits += int(max(range(len(values)), key=values.__getitem__) == self.gold[(name, d)])
-            metrics[name] = hits / len(docs)
+                outcomes.append(int(max(range(len(values)), key=values.__getitem__) == self.gold[(name, d)]))
+            self.outcomes[name] = outcomes
+            metrics[name] = sum(outcomes) / len(docs)
         return metrics
 
 
@@ -380,6 +382,7 @@ class ResidentSession:
         self._gen_scorers: dict[tuple[int, int], Any] = {}
         self._token_budget: int | None = None
         self._gen_batch = 16
+        self.last_items: dict[str, list[int]] = {}  # per-item 0/1 outcomes of the latest evaluation
         if not trust_self_check:
             self._self_check()
 
@@ -511,6 +514,7 @@ class ResidentSession:
         torch = _torch()
         scorer = self._scorer(window)
         metrics = self._score_generative(window)
+        self.last_items = dict(self._generative(window).outcomes) if metrics else {}
         if not scorer.requests:
             return metrics
         max_tokens = min(max_tokens, self._token_budget or max_tokens)
@@ -521,7 +525,9 @@ class ResidentSession:
                     for batch in scorer.batches(max_tokens):
                         for i, value in zip(batch, self._logprobs(scorer, batch)):
                             loglik[i] = value
-                return {**scorer.accuracy(loglik), **metrics}
+                accuracy = scorer.accuracy(loglik)
+                self.last_items = {**scorer.outcomes, **self.last_items}
+                return {**accuracy, **metrics}
             except RuntimeError as exc:
                 if not _is_out_of_memory(exc):
                     raise

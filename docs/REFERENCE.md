@@ -100,6 +100,17 @@ Safeguards: on startup the session checks `lm_head(base_model(x))` (plus a known
 checkpoint tensors it cannot map onto the loaded model abort with a message instead of being skipped; batches shrink automatically on out-of-memory.
 `search` needs `evaluation.limit`, scores log-likelihood tasks (`acc`, `acc_norm`) and generative tasks (`exact_match`, greedy decoding), and bf16 rounding makes a 100-item accuracy move by 1-3 items between batch compositions.
 
+`lerp search` also stores the 0/1 outcome of every scored item (`items.json` next to each score, for candidates and baselines). With them,
+
+```bash
+lerp pairs -r runs/my -g 0 -i 3                  # candidate vs base and every parent
+lerp pairs -r runs/my -g 0 -i 3 --against arc -o pairs.json
+```
+
+compares two models on the same items: per task and pooled, accuracies, the difference with a 95% interval (Wald with +0.5 per cell), the counts of items only one of them gets right, and the exact
+McNemar p-value on those. Scores recorded by other backends (`lerp cycle`) have no item outcomes and are refused. The window is the one the search selected on, so a winner's numbers are optimistic; confirm on fresh items with `lerp validate`.
+`lerp compare-samples` prints the same McNemar block when both JSONL files hold 0/1 scores.
+
 Measured on an Intel Arc 140V (16 GB):
 
 | model | kind | items per task | `lm-eval` per candidate | `lerp search` |

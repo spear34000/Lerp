@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import random
+import sys
 from pathlib import Path
 
 import pytest
@@ -219,6 +221,8 @@ def test_search_run_scores_generations_in_the_normal_run_folder(tmp_path):
         search_run(run, 1, session=session)
 
 
+@pytest.mark.skipif(sys.platform == "win32" and bool(os.environ.get("CI")),
+                    reason="bf16 CPU kernels crash with an illegal instruction (0xc000001d) on some GitHub Windows runners; runs on Linux CI and locally")
 def test_self_check_does_not_false_alarm_in_bfloat16(tmp_path):
     _three(tmp_path)
     spec = _spec(tmp_path / "base", [tmp_path / "p0", tmp_path / "p1"])

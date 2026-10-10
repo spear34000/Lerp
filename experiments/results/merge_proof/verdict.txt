@@ -1,0 +1,66 @@
+
+=== arcboolq  (arc + boolq), 3 seed(s), fresh items 500-1500 per task ===
+seed model         pooled  arc_easy     boolq
+   1 base           0.602     0.591     0.613
+   1 arc            0.672     0.721     0.623
+   1 boolq          0.709     0.638     0.780
+   1 blend_0.5      0.734     0.719     0.748
+   1 blend_best     0.734     0.720     0.748
+   1 multitask      0.740     0.727     0.752
+   2 base           0.602     0.591     0.613
+   2 arc            0.681     0.731     0.631
+   2 boolq          0.694     0.619     0.768
+   2 blend_0.5      0.731     0.723     0.739
+   2 blend_best     0.735     0.709     0.761
+   2 multitask      0.731     0.729     0.733
+   3 base           0.602     0.591     0.613
+   3 arc            0.671     0.729     0.614
+   3 boolq          0.715     0.668     0.761
+   3 blend_0.5      0.732     0.734     0.731
+   3 blend_best     0.733     0.735     0.731
+   3 multitask      0.739     0.730     0.748
+
+blend_best: pooled difference [95% CI], McNemar p
+  seed 1: vs arc: +0.062 [+0.044,+0.080] p=0.0000  |  vs boolq: +0.025 [+0.010,+0.040] p=0.0014  |  vs multitask: -0.005 [-0.020,+0.009] p=0.4973
+  seed 2: vs arc: +0.054 [+0.036,+0.072] p=0.0000  |  vs boolq: +0.042 [+0.029,+0.054] p=0.0000  |  vs multitask: +0.004 [-0.011,+0.019] p=0.6401
+  seed 3: vs arc: +0.061 [+0.045,+0.077] p=0.0000  |  vs boolq: +0.018 [+0.003,+0.034] p=0.0213  |  vs multitask: -0.006 [-0.020,+0.008] p=0.4479
+  -> criteria met in 1/3 seeds: NOT PROVEN (needs all of >= 3 seeds)
+
+blend_0.5: pooled difference [95% CI], McNemar p
+  seed 1: vs arc: +0.061 [+0.044,+0.079] p=0.0000  |  vs boolq: +0.025 [+0.009,+0.040] p=0.0023  |  vs multitask: -0.006 [-0.020,+0.008] p=0.4368
+  seed 2: vs arc: +0.050 [+0.034,+0.066] p=0.0000  |  vs boolq: +0.037 [+0.022,+0.053] p=0.0000  |  vs multitask: +0.000 [-0.014,+0.014] p=1.0000
+  seed 3: vs arc: +0.061 [+0.044,+0.078] p=0.0000  |  vs boolq: +0.018 [+0.003,+0.033] p=0.0192  |  vs multitask: -0.006 [-0.021,+0.008] p=0.4132
+  -> criteria met in 1/3 seeds: NOT PROVEN (needs all of >= 3 seeds)
+
+=== piqahella  (piqa + hellaswag), 3 seed(s), fresh items 500-1500 per task ===
+seed model         pooled      piqa hellaswag
+   1 base           0.596     0.688     0.504
+   1 piqa           0.602     0.694     0.510
+   1 hellaswag      0.595     0.675     0.515
+   1 blend_0.5      0.599     0.694     0.503
+   1 blend_best     0.600     0.700     0.500
+   1 multitask      0.604     0.693     0.515
+   2 base           0.596     0.688     0.504
+   2 piqa           0.602     0.699     0.505
+   2 hellaswag      0.593     0.677     0.509
+   2 blend_0.5      0.601     0.695     0.507
+   2 blend_best     0.598     0.690     0.506
+   2 multitask      0.605     0.700     0.510
+   3 base           0.596     0.688     0.504
+   3 piqa           0.603     0.697     0.509
+   3 hellaswag      0.600     0.680     0.520
+   3 blend_0.5      0.602     0.694     0.510
+   3 blend_best     0.602     0.694     0.510
+   3 multitask      0.613     0.699     0.527
+
+blend_best: pooled difference [95% CI], McNemar p
+  seed 1: vs piqa: -0.002 [-0.010,+0.006] p=0.7163  |  vs hellaswag: +0.005 [-0.006,+0.016] p=0.4300  |  vs multitask: -0.004 [-0.015,+0.007] p=0.5331
+  seed 2: vs piqa: -0.004 [-0.015,+0.007] p=0.5230  |  vs hellaswag: +0.005 [-0.005,+0.015] p=0.3729  |  vs multitask: -0.007 [-0.017,+0.003] p=0.1978
+  seed 3: vs piqa: -0.001 [-0.010,+0.008] p=0.9142  |  vs hellaswag: +0.002 [-0.008,+0.012] p=0.7730  |  vs multitask: -0.011 [-0.022,-0.000] p=0.0568
+  -> criteria met in 0/3 seeds: NOT PROVEN (needs all of >= 3 seeds)
+
+blend_0.5: pooled difference [95% CI], McNemar p
+  seed 1: vs piqa: -0.004 [-0.013,+0.006] p=0.5203  |  vs hellaswag: +0.004 [-0.007,+0.014] p=0.5657  |  vs multitask: -0.005 [-0.016,+0.005] p=0.3553
+  seed 2: vs piqa: -0.001 [-0.011,+0.009] p=0.9204  |  vs hellaswag: +0.008 [-0.003,+0.019] p=0.1847  |  vs multitask: -0.004 [-0.014,+0.006] p=0.5008
+  seed 3: vs piqa: -0.001 [-0.010,+0.008] p=0.9142  |  vs hellaswag: +0.002 [-0.008,+0.012] p=0.7730  |  vs multitask: -0.011 [-0.022,-0.000] p=0.0568
+  -> criteria met in 0/3 seeds: NOT PROVEN (needs all of >= 3 seeds)

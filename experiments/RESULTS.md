@@ -273,3 +273,28 @@ task-vector methods effectively move toward the Instruct model only), weight 0.5
 Every difference is within the noise of 100 items (standard error about 0.04): **no method is shown to be better than linear** here. What the run establishes is that the methods execute on a 6.9B-parameter mixture-of-experts
 checkpoint with sane scores. Their equality with the `lite` engine is established on tiny models in the tests, not at this scale. Cost: because fused experts are merged expert by expert and TIES needs an order
 statistic per tensor on the CPU, applying a candidate takes 2-7x longer than linear blending (30 s -> 62-214 s); the apply step is the target of the planned speed work.
+
+## Closed evolutionary learning loop (`lerp evolve`), first run: **not shown to beat plain training**
+
+Loop (`lerp/evolution/`): founders learn skills (LoRA SFT), survivors are crossed (LoRA rank concatenation), each child **learns a new skill** on verifiable problems (continuing from the inherited merged adapter, with 50% replay of the founders'
+skills), is compressed back to rank 16 by truncated SVD (energy kept 0.85-0.99), scored on a dev split, and the best survive as the next parents. Problems are arithmetic with exact answers (`add`, `mul`; the new skill `chain`: `a + b * c`,
+`a * b - c`); train, dev and test questions are disjoint (asserted), the final comparison uses a test split no step of the loop ever saw. Criteria were fixed in `orchestrator.CRITERIA` before the run: the evolved best must beat the best founder on
+the new skill by >= 0.05 (McNemar p < 0.01, CI above 0), lose at most 0.05 on the old skills, and beat the **compute-matched plain-training control** (same total training steps, one adapter, same data mix, started from the 0.5 merge of the founders) with p < 0.05.
+
+Setup: Qwen2.5-0.5B, 2 founders x 150 steps, 3 generations, <= 4 children per generation x 100 steps (11 children, 1100 steps total; the control trains 1100 steps), seed 1, 300 test items per family, bf16 on the Arc 140V, 40 min wall clock.
+
+| model | add | mul | chain (new) |
+|---|---:|---:|---:|
+| base | 0.597 | 0.227 | 0.007 |
+| founder add | 0.927 | 0.260 | 0.010 |
+| founder mul | 0.820 | 0.313 | 0.027 |
+| merge-only (0.5, no learning) | 0.933 | 0.303 | 0.017 |
+| **evolved best** (g3-c0, lineage g0-add, g0-mul, g1-c0, g1-c1, g2-c2, g2-c3, g3-c0) | 0.907 | 0.307 | 0.080 |
+| **plain training control** (1100 steps) | 0.930 | 0.343 | 0.130 |
+
+* New skill learned: evolved vs best founder on `chain` +0.053, 95% CI [+0.020, +0.086], p = 0.0025 (21 vs 5 items) - the gate is passed, narrowly. Old skills retained (-0.020 add, -0.007 mul).
+* **Evolution did not beat plain training: on `chain` the control is better, evolved - control = -0.050 [-0.090, -0.009], p = 0.024 (12 vs 27 items); on `mul` -0.037 [-0.068, -0.005], p = 0.035.** Verdict from the pre-set criteria: *learned and retained, but NOT shown to beat plain training*.
+* The absolute numbers are low: a 0.5B model learns `a + b * c` only to 13% with 1100 steps. The loop spreads the same compute over 11 children of 100 steps each, so every lineage gets little learning; selection on a 100-item dev split picks among near-equal candidates (dev chain 0.06-0.10) mostly by noise.
+
+Limits: one seed, one configuration, a model too small for the new skill, no tuning of the loop. This does not show that an evolutionary outer loop can never help (more steps per child, a skill the founders' recombination actually helps with, larger populations); it shows that
+at this scale it is not better than training one adapter for the same number of steps, and the loop is not "evolution that accumulates abilities" until that comparison is won.

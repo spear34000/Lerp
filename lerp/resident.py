@@ -458,10 +458,12 @@ class ResidentSession:
             ids[row, width - len(seq):] = torch.tensor(seq)
             mask[row, width - len(seq):] = 1
         limits = gen.tasks[gen.items[batch[0]][0]].generate
-        out = self.model.generate(
-            input_ids=ids.to(self.device), attention_mask=mask.to(self.device), do_sample=False, temperature=None, top_p=None,
-            top_k=None, max_new_tokens=limits.get("max_new_tokens", 256), pad_token_id=gen.pad_id(),
-            stop_strings=limits.get("stop") or None, tokenizer=self.tokenizer if limits.get("stop") else None)
+        kwargs = dict(input_ids=ids.to(self.device), attention_mask=mask.to(self.device), do_sample=False, temperature=None, top_p=None,
+                      top_k=None, max_new_tokens=limits.get("max_new_tokens", 256), pad_token_id=gen.pad_id())
+        try:
+            out = self.model.generate(**kwargs, stop_strings=limits.get("stop") or None, tokenizer=self.tokenizer if limits.get("stop") else None)
+        except ValueError:  # a tokenizer whose pieces cannot be matched against stop strings: decode to the limit, the stops cut afterwards
+            out = self.model.generate(**kwargs)
         return self.tokenizer.batch_decode(out[:, width:], skip_special_tokens=True)
 
     def _score_generative(self, window: tuple[int, int]) -> dict[str, float]:
@@ -615,7 +617,8 @@ class ResidentSession:
             "engine": "lerp-resident", "protocol_version": PROTOCOL_VERSION, "mode": self.spec.mode,
             "items": list(window), "dtype": self.dtype, "device": str(self.device), "model_type": self.model_type,
             "tasks": {t.name: {"metric": t.metric, "definition_sha256": hashlib.sha256(
-                (t.definition or json.dumps(dataclasses.asdict(resolve_task(t.name)), sort_keys=True)).encode("utf-8")).hexdigest()}
+                (t.definition or json.dumps(dataclasses.asdict(resolve_task(t.name)), sort_keys=True)).encode("utf-8")).hexdigest(),
+                **({"data_sha256": digest} if (digest := resolve_task(t.name, t.definition).data_sha256()) else {})}
                 for t in self.spec.evaluation.tasks},
             "requests": len(scorer.requests), "tokens": scorer.tokens, "softcap": self.softcap,
             "generation": {"decoding": "greedy", "prompts": len(self._generative(window).items)},

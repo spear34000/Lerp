@@ -23,7 +23,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--base", required=True)
-ap.add_argument("--skill", choices=["arc", "hellaswag", "piqa", "boolq"], required=True)
+ap.add_argument("--skill", required=True, help="arc, hellaswag, piqa, boolq, or a comma list (multi-task: equal numbers of examples, interleaved)")
 ap.add_argument("--out", required=True)
 ap.add_argument("--steps", type=int, default=300)
 ap.add_argument("--batch", type=int, default=4)
@@ -77,15 +77,28 @@ def boolq_examples():
         yield f"{row['passage']}\nQuestion: {row['question']}?\nAnswer:", " " + ["no", "yes"][int(row["label"])]
 
 
-examples = list({"arc": arc_examples, "hellaswag": hellaswag_examples, "piqa": piqa_examples,
-                 "boolq": boolq_examples}[args.skill]())
+SKILLS = {"arc": arc_examples, "hellaswag": hellaswag_examples, "piqa": piqa_examples, "boolq": boolq_examples}
+names = args.skill.split(",")
+if any(n not in SKILLS for n in names):
+    raise SystemExit(f"unknown skill in {args.skill!r}; choose from {sorted(SKILLS)}")
+per_skill = []
+for n in names:
+    items = list(SKILLS[n]())
+    random.Random(args.seed).shuffle(items)
+    per_skill.append(items)
+if len(names) == 1:
+    examples = per_skill[0]
+else:  # equal numbers from every skill, interleaved so each batch mixes them
+    size = min(map(len, per_skill))
+    examples = [per_skill[k][i] for i in range(size) for k in range(len(names))]
 # Truncation would cut off the answer tokens, so drop examples that do not fit.
 _tok = AutoTokenizer.from_pretrained(args.base)
 _before = len(examples)
 examples = [(p, c) for p, c in examples if len(_tok(p + c, add_special_tokens=False)["input_ids"]) <= args.max_len]
 if len(examples) != _before:
     print(f"dropped {_before - len(examples)} examples longer than {args.max_len} tokens", flush=True)
-random.shuffle(examples)
+if len(names) == 1:
+    random.shuffle(examples)
 print(f"{args.skill}: {len(examples)} training examples", flush=True)
 
 tok = AutoTokenizer.from_pretrained(args.base)

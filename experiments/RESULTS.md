@@ -427,3 +427,24 @@ Also corrected: the founders **are** complementary on the test items (`add`: 0.9
 child from generation 2); that the control forgot nothing means the gate's *benefit* was not demonstrated, not that it had nothing to do. The statement that an evolutionary loop "cannot win" against plain training on a single smoothly learnable skill is a hypothesis, not a result.
 
 What remains: **no evidence that the evolutionary loop beats plain training; an observed but unreplicated deficit; causes not separable with these runs.** The next step is a condition-matched design (fixed data mix, the same starting adapter and training rank, continuous versus segmented training from the same start) before any further loop change.
+
+## Restarting the optimizer and schedule every 200 steps: continuous vs segmented training (`experiments/restart_effect.py`, pilot)
+
+Design (fixed before running; reviewed externally): per seed, C1 trains 1,200 steps continuously; C2 trains six 200-step segments, each starting a fresh optimizer and its own warm-up + cosine schedule. Identical otherwise: the same starting adapter (0.5/0.5 combination of the
+founders, rank 32), the same prepared stream of 9,600 pairs with the family shares exact (chain 50% / add 25% / mul 25%) consumed in the same order, the same training rank (32) and training seed, and the same evaluation (rank 32 as trained, no compression, no selection). Three seeds, the same
+600 test items for all of them (not three independent test sets). -0.02 on `chain` was set as a practical threshold for pursuing the explanation, not as a significance test. C1 equals "segmented with carried optimizer state, global schedule and data offset" up to 1e-6 in a short
+real-training check (`tests/test_restart.py`), and each missing ingredient breaks the equality, so the code path behaves as intended.
+
+| seed | C1 add / mul / chain | C2 add / mul / chain | chain: C2 - C1 [95% CI], McNemar p (only C2 vs only C1) |
+|---|---|---|---|
+| 1 | 0.937 / 0.340 / 0.128 | 0.902 / 0.287 / 0.085 | -0.043 [-0.073, -0.014] p = 0.005 (28 vs 54) |
+| 2 | 0.903 / 0.320 / 0.120 | 0.893 / 0.282 / 0.095 | -0.025 [-0.051, +0.001] p = 0.077 (24 vs 39) |
+| 3 | 0.930 / 0.328 / 0.132 | 0.883 / 0.293 / 0.100 | -0.032 [-0.062, -0.001] p = 0.053 (34 vs 53) |
+
+* Mean C2 - C1 on `chain` = **-0.033**, negative in all three seeds, beyond the -0.02 threshold in every seed; `mul` and `add` were also lower under C2 in every seed (mul -0.042 on average, add -0.031 on average).
+* By the rule written beforehand, the restart explanation is **worth pursuing further**. This is a pilot, not a verdict: one model size, one task family, three seeds that share test items (per-seed intervals are the honest uncertainty; two of the three touch zero), and three negative signs by chance have probability 12.5%.
+* What it shows: with data mix, rank, starting point and number of steps matched, splitting training into restarted segments scored lower than continuous training. What it does not show: which part is responsible (optimizer state, warm-up, or the cosine decay to zero in every segment), or that restarts explain the gaps seen in the evolved arms; those arms also differed in data mix, rank and starting point
+  (see *Corrections*) and the follow-up variants were not rerun under matched conditions. The magnitude (-0.033) is similar to the evolved-versus-control gaps (-0.018 to -0.035), which makes the explanation plausible, not confirmed.
+* The continuous runs (chain 0.120-0.132) score higher than the earlier controls (0.100-0.118); the difference we know of is the training mix (exactly 50% `chain` here against 33.3% for the earlier 1,200-step control), consistent with the data-mix confound found in review. Not isolated.
+
+Next step suggested by this result, not yet done: separate the components of the restart (carry only the optimizer state; use one global schedule with fresh optimizers), then rerun the evolution comparison with matched data mix, rank and starting point.

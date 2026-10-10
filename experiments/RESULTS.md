@@ -485,3 +485,29 @@ Effects on `chain` (seed mean, item-bootstrap 95% interval; per-seed values; ver
 * What it does not separate: warm-up from the cosine decay to zero inside the schedule factor, and the relevance to the evolved arms (those also differed in data mix, rank and starting point and were not rerun under matched conditions). One model size, one task family, three seeds.
 * Practical consequence for the evolution loop (an inference, not a tested result): a child that trains with its own warm-up + decay-to-zero schedule loses about 0.04-0.05 on `chain` compared with the same steps inside one schedule. Using one global schedule across generations (or a non-decaying one) looks necessary before comparing a loop with plain training; carrying the
   optimizer state is not needed (and across crossover or compression the parent's Adam state has no defined meaning, so resetting it is acceptable under a global schedule).
+
+## Evolution against plain training under matched conditions (`experiments/matched_evolution.py`, `lerp/evolution/matched.py`): **behind, by the pre-set rule**
+
+What was matched (all settings in the script before running): Qwen2.5-0.5B; the same start adapter (0.5/0.5 combination of the founders); the same training data mix, exactly chain 50% / add 25% / mul 25% (`problems.stream`); the same training rank (32); the same learning rate; one **global** warm-up + cosine schedule per lineage
+(control: 1,200 steps; evolution: 3 generations x 200 = 600 steps); no optimizer-state transfer; the same **new** 1,000 items per family for scoring (never used for training or selection, shared with the restart experiment); and the same training **cost**: the control trains 1,200 steps, the evolution arm trains
+3 generations x 2 children x 200 = 1,200 steps in total, plus 8 dev evaluations of 900 items (7,200 items) per seed for selection. The controls are the three continuous runs of the restart experiment (stream seeds 10001-10003). The evolution arm adds one step the control does not have: a cross of two rank-32 parents has rank 64 and is compressed to 32 before training
+(energy kept >= 0.99 in all 18 crosses).
+
+Design correction made **before any final score existed**: a first attempt with plus selection (parents compete with their children) and the founder-anchored forgetting gate was stopped in generation 1. With one global schedule the children are mid-training checkpoints and scored below the founders on the dev split
+(`add` 0.91 -> 0.81 / 0.78), so every child was rejected and the lineage could not advance. The arm was changed to comma selection (the next parents are the best children of the generation just trained) with the gate off; the unit test reproduces the stall with plus selection. Nothing else was changed after that.
+
+Rule fixed in advance (new skill `chain`; D = evolved minus control on the fresh items): ahead if the 3-seed mean D >= +0.02, every seed positive, item-bootstrap 95% interval excluding 0; no difference detected if |mean| < 0.01 with an interval containing 0; behind if mean <= -0.02, every seed negative, interval excluding 0; otherwise no verdict.
+
+| seed | control: add / mul / chain | evolved: add / mul / chain | chain: evolved - control [95% CI], McNemar p (only evolved vs only control) |
+|---|---|---|---|
+| 1 | 0.920 / 0.329 / 0.119 | 0.910 / 0.323 / 0.098 | -0.021 [-0.042, +0.000] p = 0.062 (47 vs 68) |
+| 2 | 0.915 / 0.320 / 0.129 | 0.910 / 0.325 / 0.087 | -0.042 [-0.063, -0.020] p < 0.001 (40 vs 82) |
+| 3 | 0.922 / 0.317 / 0.122 | 0.921 / 0.319 / 0.094 | -0.028 [-0.049, -0.007] p = 0.011 (43 vs 71) |
+
+* `chain`: mean D = **-0.030** [-0.042, -0.018] (item bootstrap), all three seeds negative -> **EVOLUTION BEHIND** by the rule. Old skills: `add` mean -0.005, `mul` mean +0.000 (no difference detected in any seed).
+* The founders and the start adapter score `chain` 0.008-0.018 (0.012 for the start), so the loop does learn the new skill (to 0.087-0.098); the continuous control learns it more (0.119-0.129).
+* Cost: both arms 1,200 training steps; the evolution arm also 7,200 dev items scored per seed. "Steps in the final lineage" is 1,000 of 1,200 because each cross merges two parents' ancestries (five children are ancestors of the final one), but the **depth** of any single path is 600 steps (the global schedule) against the control's 1,200.
+* Limits: three seeds sharing one item set (a pilot; the per-seed interval of seed 1 touches zero); one model size and one task family; the bootstrap covers item sampling only, training-seed variation enters through the all-seeds-agree requirement.
+
+Not tested, candidate explanations (**hypotheses, not findings**): (1) path depth - the control's single path is 1,200 steps deep and the loop's deepest path 600, so a **600-step continuous control** (global schedule over 600 steps, same mix) is the missing comparison to see whether the second set of children adds anything over one 600-step path;
+(2) averaging two sibling lineages at 0.5/0.5 every generation (weight averaging) may dilute what each learned; (3) selecting among two near-equal siblings on a 300-item dev split; (4) children of one generation read different streams, so each path sees 4,800 distinct pairs while the control sees 9,600.

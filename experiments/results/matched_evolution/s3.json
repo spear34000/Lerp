@@ -1,0 +1,178 @@
+{
+  "config": {
+    "base_model": "C:/Users/spear/AppData/Local/Temp/claude/C--Users-spear-project-llm/657e7f5d-5cac-48b5-ba74-1ac7859d7591/scratchpad/models/Qwen2.5-0.5B",
+    "workdir": "C:/Users/spear/AppData/Local/Temp/exp2",
+    "device": "xpu",
+    "dtype": "bfloat16",
+    "founders": [
+      "add",
+      "mul"
+    ],
+    "new_family": "chain",
+    "n_dev": 300,
+    "n_fresh": 1000,
+    "generations": 3,
+    "children": 2,
+    "survivors": 2,
+    "child_steps": 200,
+    "cross_weights": [
+      0.5
+    ],
+    "replay_fraction": 0.5,
+    "new_skill_weight": 2.0,
+    "adapter_scale": 2.0,
+    "rank": 32,
+    "lr": 0.0002,
+    "batch": 4,
+    "accum": 2,
+    "max_new_tokens": 12,
+    "seed": 3,
+    "selection": "comma",
+    "gate": false
+  },
+  "best": "g3-c1",
+  "lineage": [
+    "g0-add",
+    "g0-mul",
+    "g1-c1",
+    "g1-c0",
+    "g2-c0",
+    "g2-c1",
+    "g3-c1"
+  ],
+  "fresh_accuracy": {
+    "evolved:g3-c1": {
+      "add": 0.921,
+      "mul": 0.319,
+      "chain": 0.094
+    },
+    "control": {
+      "add": 0.922,
+      "mul": 0.317,
+      "chain": 0.122
+    },
+    "start": {
+      "add": 0.925,
+      "mul": 0.329,
+      "chain": 0.012
+    },
+    "g0-add": {
+      "add": 0.904,
+      "mul": 0.265,
+      "chain": 0.008
+    },
+    "g0-mul": {
+      "add": 0.792,
+      "mul": 0.338,
+      "chain": 0.018
+    }
+  },
+  "vs_control": {
+    "add": {
+      "items": 1000,
+      "a_accuracy": 0.921,
+      "b_accuracy": 0.922,
+      "difference": -0.001,
+      "both_right": 890,
+      "a_only": 31,
+      "b_only": 32,
+      "both_wrong": 47,
+      "p_exact_two_sided": 1.0,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.016646297028544196,
+        "upper": 0.01465028904451226,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "mul": {
+      "items": 1000,
+      "a_accuracy": 0.319,
+      "b_accuracy": 0.317,
+      "difference": 0.002,
+      "both_right": 263,
+      "a_only": 56,
+      "b_only": 54,
+      "both_wrong": 627,
+      "p_exact_two_sided": 0.9240973917982829,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.018611906771836793,
+        "upper": 0.022603922739900667,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    },
+    "chain": {
+      "items": 1000,
+      "a_accuracy": 0.094,
+      "b_accuracy": 0.122,
+      "difference": -0.028,
+      "both_right": 51,
+      "a_only": 43,
+      "b_only": 71,
+      "both_wrong": 835,
+      "p_exact_two_sided": 0.011118593448764594,
+      "ci": {
+        "confidence": 0.95,
+        "lower": -0.048848950328810065,
+        "upper": -0.007039273224084142,
+        "method": "Wald with +0.5 per cell (Agresti-Min)"
+      }
+    }
+  },
+  "cost": {
+    "training_steps": 1200,
+    "dev_evaluations": 8,
+    "dev_items_scored": 7200,
+    "compressions": [
+      {
+        "child": "g1-c0",
+        "rank_in": 32,
+        "rank_out": 32,
+        "energy_kept": 1.0
+      },
+      {
+        "child": "g1-c1",
+        "rank_in": 32,
+        "rank_out": 32,
+        "energy_kept": 1.0
+      },
+      {
+        "child": "g2-c0",
+        "rank_in": 64,
+        "rank_out": 32,
+        "energy_kept": 0.9965643051518549,
+        "out_scale": 2.0
+      },
+      {
+        "child": "g2-c1",
+        "rank_in": 64,
+        "rank_out": 32,
+        "energy_kept": 0.9965643051518549,
+        "out_scale": 2.0
+      },
+      {
+        "child": "g3-c0",
+        "rank_in": 64,
+        "rank_out": 32,
+        "energy_kept": 0.9995839079689259,
+        "out_scale": 2.0
+      },
+      {
+        "child": "g3-c1",
+        "rank_in": 64,
+        "rank_out": 32,
+        "energy_kept": 0.9995839079689259,
+        "out_scale": 2.0
+      }
+    ],
+    "control_training_steps": 1200,
+    "steps_in_final_lineage": 1000,
+    "steps_discarded": 200
+  },
+  "dev_anchor": {
+    "add": 0.91,
+    "mul": 0.33
+  },
+  "wall_seconds": 2580.3216166496277
+}

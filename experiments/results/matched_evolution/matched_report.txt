@@ -1,0 +1,36 @@
+seeds ['s1', 's2', 's3']; fresh items 1000 per family; cost per seed: 1200 training steps in total (control: the same), lineage 600 steps
+
+seed  model                 add      mul    chain
+s1    control             0.920    0.329    0.119
+s1    evolved g3-c0       0.910    0.323    0.098
+s1    start               0.925    0.329    0.012
+s1    g0-add              0.904    0.265    0.008
+s1    g0-mul              0.792    0.338    0.018
+s2    control             0.915    0.320    0.129
+s2    evolved g3-c1       0.910    0.325    0.087
+s2    start               0.925    0.329    0.012
+s2    g0-add              0.904    0.265    0.008
+s2    g0-mul              0.792    0.338    0.018
+s3    control             0.922    0.317    0.122
+s3    evolved g3-c1       0.921    0.319    0.094
+s3    start               0.925    0.329    0.012
+s3    g0-add              0.904    0.265    0.008
+s3    g0-mul              0.792    0.338    0.018
+
+evolved - control, per seed [paired McNemar 95% CI], p, on the same fresh items
+  s1 add   -0.010 [-0.027,+0.007] p=0.302 (33 vs 43)
+  s1 mul   -0.006 [-0.027,+0.015] p=0.640 (54 vs 60)
+  s1 chain -0.021 [-0.042,+0.000] p=0.062 (47 vs 68)
+  s2 add   -0.005 [-0.022,+0.012] p=0.640 (34 vs 39)
+  s2 mul   +0.005 [-0.016,+0.026] p=0.702 (57 vs 52)
+  s2 chain -0.042 [-0.063,-0.020] p=0.000 (40 vs 82)
+  s3 add   -0.001 [-0.017,+0.015] p=1.000 (31 vs 32)
+  s3 mul   +0.002 [-0.019,+0.023] p=0.924 (56 vs 54)
+  s3 chain -0.028 [-0.049,-0.007] p=0.011 (43 vs 71)
+
+`chain`: mean D = -0.030 [-0.042, -0.018] (item bootstrap), per seed -0.021 -0.042 -0.028  -> EVOLUTION BEHIND
+add: mean D = -0.005, per seed -0.010 -0.005 -0.001
+mul: mean D = +0.000, per seed -0.006 +0.005 +0.002
+
+cost per seed: s1: steps 1200 (in final lineage 1000), dev evaluations 8 = 7200 items; s2: steps 1200 (in final lineage 1000), dev evaluations 8 = 7200 items; s3: steps 1200 (in final lineage 1000), dev evaluations 8 = 7200 items
+pre-training compression (extra step, energy kept): s1: 1.00,1.00,1.00,1.00,1.00,1.00; s2: 1.00,1.00,1.00,1.00,1.00,1.00; s3: 1.00,1.00,1.00,1.00,1.00,1.00

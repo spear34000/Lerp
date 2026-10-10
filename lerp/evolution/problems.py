@@ -57,6 +57,25 @@ def splits(family: str, n_train: int, n_dev: int, n_test: int, seed: int) -> dic
     return {"train": rows[:n_train], "dev": rows[n_train:n_train + n_dev], "test": rows[n_train + n_dev:]}
 
 
+def stream(rows: dict[str, list[dict]], mix: dict[str, float], count: int, seed: int) -> list[tuple[str, str]]:
+    """``count`` training pairs with the family shares in ``mix`` EXACTLY (rounded per family), however large ``count`` is.
+
+    Each family is drawn by walking through shuffled passes over its rows (a new shuffle per pass), so a long run repeats rows instead of silently
+    changing the mix the way a cap at the pool size does; the result is shuffled once and then consumed in order."""
+    local = random.Random(seed)
+    picked: list[tuple[str, str]] = []
+    for family, share in mix.items():
+        need = round(count * share)
+        pool_rows = list(rows[family])
+        drawn: list[dict] = []
+        while len(drawn) < need:
+            local.shuffle(pool_rows)
+            drawn.extend(pool_rows[:need - len(drawn)])
+        picked += [sft_pair(r) for r in drawn]
+    local.shuffle(picked)
+    return picked
+
+
 def verify(row: dict, text: str) -> bool:
     """Exact check of a model completion against the computed answer: the first integer in the text."""
     import re

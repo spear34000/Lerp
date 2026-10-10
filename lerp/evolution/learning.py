@@ -27,10 +27,20 @@ def file_sha256(path: Path) -> str:
 
 def train_adapter(base: str, pairs: Sequence[tuple[str, str]], out: Path, *, init: Path | None = None, steps: int = 100, lr: float = 2e-4,
                   rank: int = 16, seed: int = 0, device: str = "cpu", dtype: str = "bfloat16", batch: int = 4, accum: int = 2,
-                  max_len: int = 64) -> dict:
+                  max_len: int = 64, ordered: bool = False, data_offset_steps: int = 0, schedule_total: int | None = None,
+                  schedule_offset: int = 0, warmup: int | None = None, state_in: Path | None = None, state_out: Path | None = None) -> dict:
     """Supervised fine-tuning of a LoRA adapter on (prompt, completion) pairs; the loss is on the completion tokens only.
 
-    ``init`` continues training from an existing adapter (an inherited, possibly merged one) instead of starting from a fresh one."""
+    ``init`` continues training from an existing adapter (an inherited, possibly merged one) instead of starting from a fresh one.
+
+    Segmented training that is identical to one continuous run needs three things, each its own switch:
+
+    * ``ordered=True`` consumes ``pairs`` in the given order (no shuffling) starting at ``data_offset_steps`` optimizer steps into the stream, so
+      consecutive segments read consecutive slices of one prepared stream;
+    * ``schedule_total`` / ``schedule_offset`` place this segment inside a global learning-rate schedule (default: a schedule of its own);
+    * ``state_in`` / ``state_out`` carry the optimizer state (Adam moments and step count) from one segment to the next.
+
+    Without them every call is an independent run with its own warm-up, cosine decay and fresh optimizer."""
     import torch
     from peft import LoraConfig, PeftModel, get_peft_model
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -62,13 +72,18 @@ def train_adapter(base: str, pairs: Sequence[tuple[str, str]], out: Path, *, ini
     if not encoded:
         raise LearningError("every training pair is longer than max_len")
     order = list(range(len(encoded)))
-    rng.shuffle(order)
+    if not ordered:
+        rng.shuffle(order)
     pad = tok.pad_token_id if tok.pad_token_id is not None else 0
-    warm = max(1, min(20, steps // 5))
+    sched_total = schedule_total or steps
+    warm = warmup if warmup is not None else max(1, min(20, sched_total // 5))
+    if state_in is not None:
+        opt.load_state_dict(torch.load(str(state_in), map_location="cpu"))
     model.train()
-    cursor, last = 0, 0.0
-    for step in range(steps):
-        factor = (step + 1) / warm if step < warm else 0.5 * (1 + math.cos(math.pi * (step - warm) / max(1, steps - warm)))
+    cursor, last = data_offset_steps * accum * batch, 0.0
+    for local in range(steps):
+        step = schedule_offset + local
+        factor = (step + 1) / warm if step < warm else 0.5 * (1 + math.cos(math.pi * (step - warm) / max(1, sched_total - warm)))
         for g in opt.param_groups:
             g["lr"] = lr * factor
         running = 0.0
@@ -93,6 +108,9 @@ def train_adapter(base: str, pairs: Sequence[tuple[str, str]], out: Path, *, ini
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(out))
+    if state_out is not None:
+        Path(state_out).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(opt.state_dict(), str(state_out))
     return {"steps": steps, "lr": lr, "seed": seed, "final_loss": last, "pairs": len(encoded), "pairs_sha256": pairs_sha256(pairs),
             "init": None if init is None else str(init)}
 
